@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdexcept>
+#include <format>
 
 namespace stator::core {
 
@@ -11,6 +12,13 @@ class StatorError : public std::invalid_argument
 {
 public:
     using std::invalid_argument::invalid_argument;
+
+    // Forward std::format() like calls to std::format()
+    template <typename... Args>
+    explicit StatorError(std::format_string<Args...> fmt, Args&&... args)
+        : std::invalid_argument(std::format(fmt, std::forward<Args>(args)...))
+    {
+    }
 };
 
 
@@ -23,7 +31,7 @@ public:
     using StatorError::StatorError;
 };
 
-class MaxIterations : public NumericError
+class ConvergenceFailure : public NumericError
 {
 public:
     using NumericError::NumericError;

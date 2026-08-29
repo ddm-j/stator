@@ -18,5 +18,10 @@ struct RootResult : NumericResult
     real df {};
 };
 
-
+// MinResult1D
+struct MinResult1D : NumericResult
+{
+    real x {};
+    real f {};
+};
 }
