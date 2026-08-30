@@ -30,18 +30,26 @@ struct Bracket
                 (fa > fb) && (fc > fb) // b is a minimum
             );
     }
+
+    real get_width() const
+    {
+        return std::fabs(cx - ax);
+    }
 };
 
 // Implementation Details
 namespace detail {
-    // Shifts by reference right -> left
-    // Avoids need of temp locals in bracket()
-    // Note: d is const, because nothing goes into d, we can bind an rvalue to it
     inline void shft3(real &a, real &b, real &c, const real &d)
     {
         a = b;
         b = c;
         c = d;
+    }
+
+    inline void shft2(real &a, real &b, const real &c)
+    {
+        a = b;
+        b = c;
     }
 
     // Safe function evalutation (ensure finite)
@@ -76,9 +84,6 @@ Bracket bracket(F&& func, const real a, const real b, const idx MAXIT = 100)
     }
 
     // Setup
-    constexpr real GOLD { 1.618034 };
-    constexpr real GLIMIT { 100.0 }; 
-    constexpr real TINY { 1e-20 };
     idx iter { 0 };
     real ax { a };
     real bx { b };
@@ -189,6 +194,75 @@ Bracket bracket(F&& func, const real a, const real b, const idx MAXIT = 100)
 }
 
 // golden section search, 1d minimization routine - Numerical Recipes, Third Edition
+// Contract: Unbounded Minimization
+//           User provided bracket [a, b] undergoes expansion to satisfy that
+//           the bracket contains a minimum before minimizatoin starts.
+//           Convergence in n = log(tol)/log(0.618)
+//           Tolerance is clamped to sqrt(eps) if caller specifies anything lower 
+template <ValOnly F>
+MinResult1D golden_section(F&& func, const Bracket brack, real tol = 0.0, const idx MAXIT = 100)
+{
+    // Argument Check
+    assert(brack.is_valid());
+    if ((tol < 0) || !std::isfinite(tol))
+        throw InvalidArgument("golden_section: Invalid tolerance: {}. Must be finite greater than zero.", tol);
+
+    // Tolerance Clamp
+    if (tol < std::sqrt(real_EPS))
+        tol = std::sqrt(real_EPS);
+
+    // Setup
+    const real W0 { brack.get_width() }; // Initial Bracket Width
+    real x0 {}, x1 {}, x2 {}, x3 {};
+    idx iter {};
+    x0 = brack.ax;
+    x3 = brack.cx;
+    if (std::fabs(brack.cx - brack.bx) > std::fabs(brack.bx - brack.ax))
+    {
+        x1 = brack.bx;
+        x2 = brack.bx + GOLD_C * (brack.cx - brack.bx);
+    }
+    else
+    {
+        x2 = brack.bx;
+        x1 = brack.bx - GOLD_C * (brack.bx - brack.ax);
+    }
+
+    // Initial Function Evaluations
+    real f1 { detail::eval(func, x1, iter) };
+    real f2 { detail::eval(func, x2, iter) };
+
+    // Loop
+    while (std::fabs(x3 - x0) > tol*(std::fabs(x1) + std::fabs(x2) + W0))
+    {
+        // Iteration Guard
+        if (++iter > MAXIT)
+        {
+            return MinResult1D { iter-1, false, x1, f1, std::fabs(x0 - x3) };
+        }
+
+        if (f2 < f1)
+        {
+            detail::shft3(x0, x1, x2, GOLD_R * x2 + GOLD_C * x3);
+            detail::shft2(f1, f2, detail::eval(func, x2, iter));
+        }
+        else
+        {
+            detail::shft3(x3, x2, x1, GOLD_R * x1 + GOLD_C * x0);
+            detail::shft2(f2, f1, detail::eval(func, x1, iter));
+        }
+    }
+    if (f1 < f2)
+        return MinResult1D { iter, true, x1, f1, std::fabs(x3 - x0) };
+    else
+        return MinResult1D { iter, true, x2, f2, std::fabs(x3 - x0) };
+}
+
+template <ValOnly F>
+MinResult1D golden_section(F&& func, const real a, const real b, real tol = 0.0, const idx MAXIT = 100)
+{
+    return golden_section(func, bracket(func, a, b), tol, MAXIT);
+}
 
 }
 

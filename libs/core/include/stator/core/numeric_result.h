@@ -23,5 +23,6 @@ struct MinResult1D : NumericResult
 {
     real x {};
     real f {};
+    real width {};
 };
 }

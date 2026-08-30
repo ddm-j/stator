@@ -72,7 +72,7 @@ TEST(Rtsafe, Root_Sweep)
 
     // Bracket Lambda
     auto brackets = [] (real r) -> std::pair<real, real> {
-        const real h = std::max(std::fabs(r) * 0.5, 1.0);
+        const real h = std::max(std::fabs(r) * real{0.5}, real{1.0});
         return {r - 0.3 * h, r + 0.7 * h};
     };
 
