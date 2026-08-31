@@ -14,8 +14,18 @@ if(ENABLE_COVERAGE)
   add_link_options(--coverage)
 endif()
 
+# linalg dependency
+include(FetchContent)
 
+FetchContent_Declare(linalg
+    GIT_REPOSITORY https://github.com/ddm-j/linalg.git
+    GIT_TAG        82b145ac96f8c5c14413959179cab0bbb30a22ad
+)
+FetchContent_MakeAvailable(linalg)
+
+# Libraries
 add_subdirectory(libs/core)
+add_subdirectory(libs/physics)
 
 # Directories
 add_subdirectory(tests)

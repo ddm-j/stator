@@ -61,6 +61,7 @@ namespace detail {
             throw InvalidArgument("bracket: func({}) returned non-finite value {} at iteration {}", x, f, it);
         return f;
     }
+
 }
 
 

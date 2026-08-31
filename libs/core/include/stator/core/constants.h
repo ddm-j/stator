@@ -1,6 +1,8 @@
 // constants.h
 #pragma once
 
+#include <stator/core/types.h>
+
 namespace stator::core {
 
     // Numeric Constants
