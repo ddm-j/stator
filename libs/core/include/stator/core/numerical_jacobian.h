@@ -11,7 +11,7 @@
 namespace stator::core {
 
 // A callable representing the 
-template <ValArgs F>
+template <ArgsVal F>
 class NumericalJacobian {
     F m_func;
     mutable std::vector<real> m_a_pda;   // a + da
@@ -23,7 +23,7 @@ public:
 
     // Based on NRfdjac (Numerical Recipes, 3rd Edition)
     // Numeric derivate based on forward difference
-    real operator()(real x, std::span<const real> a, std::span<real> dyda) const
+    real operator()(real x, const std::vector<real>& a, std::span<real> dyda) const
     {
         using std::abs;
 

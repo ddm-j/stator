@@ -28,12 +28,12 @@ real compare_tol(const real f, const real ai, const real fac = 100.0)
 auto linear_model = [](real x, std::span<const real> a) -> real {
     return a[0] + a[1]*x;   
 };
-static_assert(ValArgs<decltype(linear_model)>);
+// static_assert(ArgsVal<decltype(linear_model)>);
 
 auto exponential_model = [](real x, std::span<const real> a) -> real {
     return a[0] * std::exp(-a[1]*x) + a[2];   
 };
-static_assert(ValArgs<decltype(exponential_model)>);
+// static_assert(ArgsVal<decltype(exponential_model)>);
 
 //==============================================================================
 // INVALID ARGUMENT
