@@ -16,6 +16,8 @@
 using namespace stator::core;
 using linalg::Matrix;
 
+namespace {
+
 // Test Models (compliant with ArgsValJac Concept)
 auto linear_model_jac = [](real x, const std::vector<real>& a, std::vector<real>& dyda) -> real {
     dyda[0] = 1.0;
@@ -37,6 +39,7 @@ auto non_polynomial_jac = [](real x, const std::vector<real>& a, std::vector<rea
     return a[0] + a[1] * x + a[2] / (x * x);
 };
 
+
 // Symmetric Matrix Check
 void test_symmetry(const linalg::Matrix<real>& A)
 {
@@ -45,6 +48,8 @@ void test_symmetry(const linalg::Matrix<real>& A)
         {
             EXPECT_DOUBLE_EQ((A[i,j]), (A[j,i])) << std::format("Not Symmetric [{},{}] != [{},{}]", i, j, j, i);
         }
+}
+
 }
 
 // Test Outpus

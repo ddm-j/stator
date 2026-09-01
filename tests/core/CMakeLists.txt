@@ -5,4 +5,5 @@ stator_add_test(test_core stator_core
   test_numerical_jacobian.cpp
   test_covsrt.cpp
   test_mrqcof.cpp
+  test_fitmrq.cpp
 )

@@ -15,6 +15,7 @@ target_compile_options(stator_test_flags INTERFACE
 # --- the pattern, as a function ---
 function(stator_add_test name module_lib)
   add_executable(${name} ${ARGN})
+  target_include_directories(${name} PRIVATE ${CMAKE_SOURCE_DIR}/tests)
   target_link_libraries(${name} PRIVATE
     GTest::gmock_main stator_test_flags ${module_lib})
   gtest_discover_tests(${name})

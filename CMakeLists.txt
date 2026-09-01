@@ -19,7 +19,7 @@ include(FetchContent)
 
 FetchContent_Declare(linalg
     GIT_REPOSITORY https://github.com/ddm-j/linalg.git
-    GIT_TAG        82b145ac96f8c5c14413959179cab0bbb30a22ad
+    GIT_TAG        262a2412063fe067d41adaf2322c669ba9582115
 )
 FetchContent_MakeAvailable(linalg)
 

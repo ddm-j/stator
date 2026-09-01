@@ -24,6 +24,8 @@ real compare_tol(const real f, const real ai, const real fac = 100.0)
     return fac*std::sqrt(real_EPS)*f_abs / std::max(ai, 1.0);
 }
 
+namespace {
+
 // Test Models (compliant with ValArgs Concept)
 auto linear_model = [](real x, std::span<const real> a) -> real {
     return a[0] + a[1]*x;   
@@ -34,6 +36,8 @@ auto exponential_model = [](real x, std::span<const real> a) -> real {
     return a[0] * std::exp(-a[1]*x) + a[2];   
 };
 // static_assert(ArgsVal<decltype(exponential_model)>);
+
+}
 
 //==============================================================================
 // INVALID ARGUMENT
