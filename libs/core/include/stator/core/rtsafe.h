@@ -21,7 +21,7 @@ real rtsafe_tol(const real rts, const real xacc)
 }
 
 // rtsafe routine (Numerical Recipes - Third Edition)
-template <ValDer F>
+template <DifferentiableModel F>
 RootResult rtsafe(F&& func, const real x1, const real x2, const real xacc = 0.0, const idx MAXIT = 100)
 {
     // Initial Setup

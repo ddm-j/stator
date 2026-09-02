@@ -219,7 +219,7 @@ void ExpectSymmetric(const linalg::Matrix<real>& A, std::string_view name)
         }
 }
 
-template <ArgsValJac F>
+template <SensitivityModel F>
 void ExpectGradientNull(F&& func, const std::vector<real>& x,
                         const std::vector<real>& y, const std::vector<real>& sig,
                         const std::vector<bool>& ia, const std::vector<real>& a_res)

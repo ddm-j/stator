@@ -11,7 +11,7 @@
 namespace stator::core {
 
 // A callable representing the 
-template <ArgsVal F>
+template <Model F>
 class NumericalJacobian {
     F m_func;
     mutable std::vector<real> m_a_pda;   // a + da

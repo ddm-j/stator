@@ -25,11 +25,12 @@ auto create_brackets = [] (real r) -> std::pair<real, real> {
 //==============================================================================
 TEST(Golden_Section, Bad_Tol_Throws)
 {
-    auto xsquared = [](real X) -> real {
+    auto xsquared = [](real X, [[maybe_unused]] Params a) -> real {
         return std::pow(X, 2);   
     };
-    EXPECT_THROW(golden_section(xsquared, -1.0, 1.0, -1e-8), InvalidArgument);
-    EXPECT_THROW(golden_section(xsquared, -1.0, 1.0, std::numeric_limits<real>::quiet_NaN()), InvalidArgument);
+    ParamVec a{};
+    EXPECT_THROW(golden_section(xsquared, a, -1.0, 1.0, -1e-8), InvalidArgument);
+    EXPECT_THROW(golden_section(xsquared, a, -1.0, 1.0, std::numeric_limits<real>::quiet_NaN()), InvalidArgument);
 }
 
 //==============================================================================
@@ -44,17 +45,18 @@ TEST(Golden_Section, Minimum_Sweep)
     const real tol { std::sqrt(real_EPS) };
 
     // Minimum Sweep
+    ParamVec a{};
     std::vector<real> m { 0.0, -0.1, 0.1, -100.0, 100.0, -200.0, 200.0 };    
     for (idx i {}; i < m.size(); ++i)
     {
         // Setup Minimization Problem
         std::tie(x1, x2) = create_brackets(m[i]);
         real m_val { m[i] };
-        auto func = [m_val](real X) -> real {
+        auto func = [m_val](real X, [[maybe_unused]] Params a) -> real {
             return std::pow(X - m_val, 2);
         };
-        Bracket brack { bracket(func, x1, x2) };
-        MinResult1D res { golden_section(func, brack, tol)};
+        Bracket brack { bracket(func, a, x1, x2) };
+        MinResult1D res { golden_section(func, a, brack, tol)};
 
         // Convergence & Tolerance Check
         // Is converged?
@@ -73,14 +75,15 @@ TEST(Golden_Section, Maximum_Iterations)
 {
     const real tol { std::sqrt(real_EPS) };
     const idx MAXIT { 5 };
-    auto xsquared = [](real X) -> real {
+    auto xsquared = [](real X, [[maybe_unused]] Params a) -> real {
         return std::pow(X, 2);   
     };
+    ParamVec a{};
 
     real x1 {}, x2 {};
     std::tie(x1, x2) = create_brackets(10.0);
-    Bracket brack { bracket(xsquared, x1, x2) };
-    MinResult1D res { golden_section(xsquared, brack, tol, MAXIT) };
+    Bracket brack { bracket(xsquared, a, x1, x2) };
+    MinResult1D res { golden_section(xsquared, a, brack, tol, MAXIT) };
 
     // Failed to Converge?
     EXPECT_FALSE(res.converged);

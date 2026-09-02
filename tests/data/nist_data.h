@@ -27,7 +27,7 @@ struct NistProblem
 // Misra1a
 //==============================================================================
 namespace misra1a_data{
-    inline real func(real x, Params a, Jac dyda)
+    inline real func(real x, Params a, Derivative dyda)
     {
         const real E = std::exp(-a[1]*x);
         dyda[0] = 1.0 - E;
@@ -73,7 +73,7 @@ constexpr inline NistProblem misra1a {
 // Chwirut2
 //==============================================================================
 namespace chwirut2_data{
-    inline real func(real x, Params a, Jac dyda)
+    inline real func(real x, Params a, Derivative dyda)
     {
         const real E = std::exp(-a[0]*x);
         const real D = a[1] + a[2]*x;
@@ -163,7 +163,7 @@ constexpr inline NistProblem chwirut2 {
 // Gauss1
 //==============================================================================
 namespace gauss1_data{
-    inline real func(real x, Params a, Jac dyda)
+    inline real func(real x, Params a, Derivative dyda)
     {
         const real E1 = std::exp(-a[1]*x);
         const real d1 = x - a[3];

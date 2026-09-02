@@ -70,7 +70,7 @@ inline void covsrt(linalg::Matrix<real>& covar, const std::vector<bool>& ia)
 //           a.size() == ma, ia.size == ma()
 //           and sum(ia) = mfit, x/y/z.size() all equal
 //           sig[all] is > 0
-template <ArgsValJac F>
+template <SensitivityModel F>
 void mrqcof(F&& func,
             const std::vector<real>& x,
             const std::vector<real>& y,
@@ -130,7 +130,7 @@ void mrqcof(F&& func,
 }
 
 // Overload: User Supplies ArgsValJac (analytical or custom jacobian)
-template <ArgsValJac F>
+template <SensitivityModel F>
 FitResult fitmrq(
     F&& func,
     const std::vector<real>& x,
@@ -253,7 +253,7 @@ FitResult fitmrq(
 }
 
 // Overload: User Supplies ArgsVal (builtin numerical jacobian is used)
-template <ArgsVal F>
+template <Model F>
 FitResult fitmrq(
     F&& func,
     const std::vector<real>& x,
@@ -269,7 +269,7 @@ FitResult fitmrq(
 }
 
 // Overload: User supplies ArgsVal, x, y, (scalar) sig, and a
-template <ArgsVal F>
+template <Model F>
 FitResult fitmrq(
     F&& func,
     const std::vector<real>& x,

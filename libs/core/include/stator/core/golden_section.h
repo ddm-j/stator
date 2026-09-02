@@ -53,10 +53,10 @@ namespace detail {
     }
 
     // Safe function evalutation (ensure finite)
-    template <ValOnly F>
-    inline real eval(F&& func, const real x, const idx it)
+    template <Model F>
+    inline real eval(F&& func, const real x, Params a, const idx it)
     {
-        const real f { func(x) };
+        const real f { func(x, a) };
         if (!std::isfinite(f))
             throw InvalidArgument("bracket: func({}) returned non-finite value {} at iteration {}", x, f, it);
         return f;
@@ -71,8 +71,8 @@ namespace detail {
 //           func(x) is ALWAYS wrapped with eval(func, x, iteration), this
 //           garauntees that we don't need to test every return branch. It is
 //           impossible to return non-finite values.
-template <ValOnly F>
-Bracket bracket(F&& func, const real a, const real b, const idx MAXIT = 100)
+template <Model F>
+Bracket bracket(F&& func, Params p, const real a, const real b, const idx MAXIT = 100)
 {
     // Argument Check
     if (a == b)
@@ -90,8 +90,8 @@ Bracket bracket(F&& func, const real a, const real b, const idx MAXIT = 100)
     real bx { b };
     real cx {};
     real fu {};
-    real fa { detail::eval(func, ax, iter) };
-    real fb { detail::eval(func, bx, iter) };
+    real fa { detail::eval(func, ax, p, iter) };
+    real fb { detail::eval(func, bx, p, iter) };
     if (fa == fb)
     {
         throw InvalidArgument("bracket: fa(a) == fa(b) = {}. bracket cannot determine a search direction.", fa);
@@ -109,7 +109,7 @@ Bracket bracket(F&& func, const real a, const real b, const idx MAXIT = 100)
 
     // Start Bracket Loop
     cx = bx + GOLD * (bx - ax);
-    fc = detail::eval(func, cx, iter);
+    fc = detail::eval(func, cx, p, iter);
     while (fb > fc)
     {
         // Maximum Iteration Check
@@ -133,7 +133,7 @@ Bracket bracket(F&& func, const real a, const real b, const idx MAXIT = 100)
         // Branch A: u between [b, c] 
         if ((bx - u) * (u - cx) > 0.0)
         {
-            fu = detail::eval(func, u, iter);
+            fu = detail::eval(func, u, p, iter);
             if (fu < fc) // A.1: Valid Bracket, Minimum Between b and c
             {
                 ax = bx;
@@ -149,29 +149,29 @@ Bracket bracket(F&& func, const real a, const real b, const idx MAXIT = 100)
             }
             // Quadratic Interpolation did nothing
             u = cx + GOLD * (cx - bx);
-            fu = detail::eval(func, u, iter);
+            fu = detail::eval(func, u, p, iter);
         } 
         // Branch B: u between [c, ulim]
         else if ((cx - u) * (u - ulim) > 0.0)
         {
-            fu = detail::eval(func, u, iter);
+            fu = detail::eval(func, u, p, iter);
             if (fu < fc)
             {
                 detail::shft3(bx, cx, u, u + GOLD * (u - cx));
-                detail::shft3(fb, fc, fu, detail::eval(func, u, iter));
+                detail::shft3(fb, fc, fu, detail::eval(func, u, p, iter));
             }
         }
         // Branch C: u limited to ulim
         else if ((u - ulim) * (ulim - cx) >= 0.0)
         {
             u = ulim;
-            fu = detail::eval(func, u, iter);
+            fu = detail::eval(func, u, p, iter);
         }
         // Branch D: Reject Parabolic Step, use default step instead
         else 
         {
             u = cx + GOLD * (cx - bx);
-            fu = detail::eval(func, u, iter);
+            fu = detail::eval(func, u, p, iter);
         }
         detail::shft3(ax, bx, cx, u);
         detail::shft3(fa, fb, fc, fu);
@@ -200,8 +200,8 @@ Bracket bracket(F&& func, const real a, const real b, const idx MAXIT = 100)
 //           the bracket contains a minimum before minimizatoin starts.
 //           Convergence in n = log(tol)/log(0.618)
 //           Tolerance is clamped to sqrt(eps) if caller specifies anything lower 
-template <ValOnly F>
-MinResult1D golden_section(F&& func, const Bracket brack, real tol = 0.0, const idx MAXIT = 100)
+template <Model F>
+MinResult1D golden_section(F&& func, Params a, const Bracket brack, real tol = 0.0, const idx MAXIT = 100)
 {
     // Argument Check
     assert(brack.is_valid());
@@ -230,8 +230,8 @@ MinResult1D golden_section(F&& func, const Bracket brack, real tol = 0.0, const 
     }
 
     // Initial Function Evaluations
-    real f1 { detail::eval(func, x1, iter) };
-    real f2 { detail::eval(func, x2, iter) };
+    real f1 { detail::eval(func, x1, a, iter) };
+    real f2 { detail::eval(func, x2, a, iter) };
 
     // Loop
     while (std::fabs(x3 - x0) > tol*(std::fabs(x1) + std::fabs(x2) + W0))
@@ -245,12 +245,12 @@ MinResult1D golden_section(F&& func, const Bracket brack, real tol = 0.0, const 
         if (f2 < f1)
         {
             detail::shft3(x0, x1, x2, GOLD_R * x2 + GOLD_C * x3);
-            detail::shft2(f1, f2, detail::eval(func, x2, iter));
+            detail::shft2(f1, f2, detail::eval(func, x2, a, iter));
         }
         else
         {
             detail::shft3(x3, x2, x1, GOLD_R * x1 + GOLD_C * x0);
-            detail::shft2(f2, f1, detail::eval(func, x1, iter));
+            detail::shft2(f2, f1, detail::eval(func, x1, a, iter));
         }
     }
     if (f1 < f2)
@@ -259,10 +259,11 @@ MinResult1D golden_section(F&& func, const Bracket brack, real tol = 0.0, const 
         return MinResult1D { iter, true, x2, f2, std::fabs(x3 - x0) };
 }
 
-template <ValOnly F>
-MinResult1D golden_section(F&& func, const real a, const real b, real tol = 0.0, const idx MAXIT = 100)
+template <Model F>
+MinResult1D golden_section(F&& func, Params p, const real a, const real b, real tol = 0.0, const idx MAXIT = 100)
 {
-    return golden_section(func, bracket(func, a, b), tol, MAXIT);
+    Bracket brack { bracket(func, p, a, b) };
+    return golden_section(func, p, brack, tol, MAXIT);
 }
 
 }

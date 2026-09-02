@@ -7,30 +7,26 @@
 
 namespace stator::core{
 
-// Value-Only Callback (f(x) alone)
+// Concept Arguments
+using Params     = const std::vector<real>&;
+using Derivative = std::vector<real>&;
+
+
+// f(x; a) — Model f(x, a, b, c...)
 template <class F>
-concept ValOnly = std::regular_invocable<F, real> &&
-    std::convertible_to<std::invoke_result_t<F, real>, real>;
-
-// Value-Derivative Pair Callback (implies f(x) and df(x) at the same point)
-template <class F>
-concept ValDer = std::regular_invocable<F, real> &&
-    std::convertible_to<std::invoke_result_t<F, real>, std::pair<real, real>>;
-
-
-using Params = const std::vector<real>&;
-using Jac    = std::vector<real>&;
-
-// f(x; a) only — Model f(x, a, b, c...)
-template <class F>
-concept ArgsVal =
+concept Model =
     std::regular_invocable<F, real, Params> &&
     std::same_as<std::invoke_result_t<F, real, Params>, real>;
 
-// f(x; a) and the jacobian
+// f(x, a, dfdx) - f(x, a) where dfdx is a vector modified by the callable and stores df/dx
 template <class F>
-concept ArgsValJac =
-    std::regular_invocable<F, real, Params, Jac> &&
-    std::same_as<std::invoke_result_t<F, real, Params, Jac>, real>;
+concept DifferentiableModel = std::regular_invocable<F, real> &&
+    std::convertible_to<std::invoke_result_t<F, real>, std::pair<real, real>>;
+
+// f(x, a, dadx) - f(x, a) where dadx is a vector modified by the callable and stores da/dx
+template <class F>
+concept SensitivityModel =
+    std::regular_invocable<F, real, Params, Derivative> &&
+    std::same_as<std::invoke_result_t<F, real, Params, Derivative>, real>;
 
 }
