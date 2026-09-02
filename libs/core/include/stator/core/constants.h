@@ -1,12 +1,14 @@
 // constants.h
 #pragma once
 
+#include <numbers>
 #include <stator/core/types.h>
 
 namespace stator::core {
 
     // Numeric Constants
     inline constexpr real real_EPS { std::numeric_limits<real>::epsilon() };
+    inline constexpr real pi { static_cast<real>(std::numbers::pi ) };
 
     // Bracketing Constants
     constexpr real GOLD { 1.618034 };
