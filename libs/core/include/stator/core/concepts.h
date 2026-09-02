@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <span>
+#include <utility>
 #include "stator/core/types.h"
 
 namespace stator::core{
@@ -18,10 +19,11 @@ concept Model =
     std::regular_invocable<F, real, Params> &&
     std::same_as<std::invoke_result_t<F, real, Params>, real>;
 
-// f(x, a, dfdx) - f(x, a) where dfdx is a vector modified by the callable and stores df/dx
+// f(x, a) - f(x, a) where [f(x), dfdx(x)] is returned as a pair
 template <class F>
-concept DifferentiableModel = std::regular_invocable<F, real> &&
-    std::convertible_to<std::invoke_result_t<F, real>, std::pair<real, real>>;
+concept DifferentiableModel = 
+    std::regular_invocable<F, real, Params> &&
+    std::same_as<std::invoke_result_t<F, real, Params>, std::pair<real, real>>;
 
 // f(x, a, dadx) - f(x, a) where dadx is a vector modified by the callable and stores da/dx
 template <class F>

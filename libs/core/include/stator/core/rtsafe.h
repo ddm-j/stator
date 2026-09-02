@@ -22,7 +22,7 @@ real rtsafe_tol(const real rts, const real xacc)
 
 // rtsafe routine (Numerical Recipes - Third Edition)
 template <DifferentiableModel F>
-RootResult rtsafe(F&& func, const real x1, const real x2, const real xacc = 0.0, const idx MAXIT = 100)
+RootResult rtsafe(F&& func, Params a, const real x1, const real x2, const real xacc = 0.0, const idx MAXIT = 100)
 {
     // Initial Setup
     real tol {};
@@ -32,8 +32,8 @@ RootResult rtsafe(F&& func, const real x1, const real x2, const real xacc = 0.0,
     real dx{}, dx_old{};
     real rts{};
     real temp{};
-    std::tie(fl, dfl) = func(x1);
-    std::tie(fh, dfh) = func(x2);
+    std::tie(fl, dfl) = func(x1, a);
+    std::tie(fh, dfh) = func(x2, a);
 
     // Check Provided [x1, x2] bracket
     if ((fl > 0.0 && fh > 0.0) || (fl < 0.0 && fh < 0.0))
@@ -56,7 +56,7 @@ RootResult rtsafe(F&& func, const real x1, const real x2, const real xacc = 0.0,
     rts = 0.5 * (x1 + x2);
     dx_old = std::fabs(x2 - x1);
     dx = dx_old;
-    std::tie(f, df) = func(rts);
+    std::tie(f, df) = func(rts, a);
     if (f == 0.0)
     { // Rare Early return where rts hits the root before the loop
         return RootResult { 0, true, rts, f, df };
@@ -73,7 +73,7 @@ RootResult rtsafe(F&& func, const real x1, const real x2, const real xacc = 0.0,
             rts = xl + dx;
             if (xl == rts)
             {
-                std::tie(f, df) = func(rts);
+                std::tie(f, df) = func(rts, a);
                 return RootResult { j, true, rts, f, df };
             }
         } else
@@ -84,13 +84,13 @@ RootResult rtsafe(F&& func, const real x1, const real x2, const real xacc = 0.0,
             rts -= dx;
             if (temp == rts)
             {
-                std::tie(f, df) = func(rts);
+                std::tie(f, df) = func(rts, a);
                 return RootResult { j, true, rts, f, df };
             }
         }
 
         // Update Function
-        std::tie(f, df) = func(rts);
+        std::tie(f, df) = func(rts, a);
 
         // Convergence Criteria
         tol = rtsafe_tol(rts, xacc);
