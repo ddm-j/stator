@@ -182,3 +182,30 @@ TEST(Rtsafe, Convergence_Rate)
     };
     EXPECT_LE(res.iterations, 8) << "Rtsafe not converging fast enough for smooth function";
 }
+
+TEST(Rtsafe, Numerical_Derivative)
+{
+    // Test Rtsafe against an adversarial function, compared with numerical derivative overload version
+    // (x-1)^3 - Zero derivative root + divide by zero
+    ParamVec a{};
+    RootResult res_an = rtsafe(
+        [](real X, [[maybe_unused]] Params a) -> std::pair<real, real> {
+            return {
+                std::pow(X-1, 3),
+                3.0*std::pow(X-1, 2)
+            };
+        }, a, 0.0, 2.0, 0.0, 100
+    );
+    RootResult res_num = rtsafe(
+        [](real X, [[maybe_unused]] Params a) -> real {
+            return std::pow(X-1, 3);
+        }, a, 0.0, 2.0, 0.0, 100
+    );
+
+    // Both Should Converge
+    EXPECT_TRUE(res_an.converged) << "Rtsafe failed on (x-1)^3 - x = " << res_an.x << " - " << res_an.iterations << " iterations";
+    EXPECT_TRUE(res_num.converged) << "Rtsafe failed on (x-1)^3 - x = " << res_num.x << " - " << res_num.iterations << " iterations";
+
+    // Compare Root
+    EXPECT_NEAR(res_an.x, res_num.x, 1e-10) << "Rtsafe with numerical derivative differs from analytical";
+}

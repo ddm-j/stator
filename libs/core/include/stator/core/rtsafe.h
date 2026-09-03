@@ -11,6 +11,7 @@
 #include "stator/core/concepts.h"
 #include "stator/core/errors.h"
 #include "stator/core/numeric_result.h"
+#include "stator/core/numerical_derivative.h"
 
 namespace stator::core {
 
@@ -106,6 +107,15 @@ RootResult rtsafe(F&& func, Params a, const real x1, const real x2, const real x
             xh = rts;
     }
     return RootResult { MAXIT, false, rts, f, df };
+}
+
+// Overload with numerical derivative
+template <Model F>
+RootResult rtsafe(F&& func, Params a, const real x1, const real x2, const real xacc = 0.0, const idx MAXIT = 100)
+{
+    // Converts "Model" to "DifferentiableModel" with forward differece numerical derivative
+    NumericalDerivative nd { func };
+    return rtsafe(nd, a, x1, x2, xacc, MAXIT);
 }
 
 }
