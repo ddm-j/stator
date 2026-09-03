@@ -6,6 +6,14 @@
 
 namespace stator::core {
 
+// Linear Regression Result
+struct LinRegResult
+{
+    real a {};
+    real b {};
+    real abdev {};
+};
+
 // Generic Numeric Result
 struct NumericResult
 {
