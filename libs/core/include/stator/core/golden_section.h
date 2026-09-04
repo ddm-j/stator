@@ -259,11 +259,26 @@ MinResult1D golden_section(F&& func, Params a, const Bracket brack, real tol = 0
         return MinResult1D { iter, true, x2, f2, std::fabs(x3 - x0) };
 }
 
+// Overload for passing in guess a and b initial bracket
 template <Model F>
 MinResult1D golden_section(F&& func, Params p, const real a, const real b, real tol = 0.0, const idx MAXIT = 100)
 {
     Bracket brack { bracket(func, p, a, b) };
     return golden_section(func, p, brack, tol, MAXIT);
+}
+
+// Overload for passing a model that doesn't take parameters
+template <UnaryModel F>
+MinResult1D golden_section(F&& func, const real a, const real b, real tol = 0.0, const idx MAXIT = 100)
+{
+    // Create a callable compliant with the Model Concept (f(x; a))
+    auto wrapped = [&](real x, Params) { return func(x) };
+
+    // Dummy parameters
+    const std::vector<real> empty {};
+
+    Bracket brack { bracket(func, empty, a, b) };
+    return golden_section(func, empty, brack, tol, MAXIT);
 }
 
 }

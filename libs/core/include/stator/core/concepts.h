@@ -12,6 +12,11 @@ namespace stator::core{
 using Params     = const std::vector<real>&;
 using Derivative = std::vector<real>&;
 
+// f(x) — Model f(x)
+template <class F>
+concept UnaryModel =
+    std::regular_invocable<F, real> &&
+    std::same_as<std::invoke_result_t<F, real>, real>;
 
 // f(x; a) — Model f(x, a, b, c...)
 template <class F>
