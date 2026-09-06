@@ -272,13 +272,26 @@ template <UnaryModel F>
 MinResult1D golden_section(F&& func, const real a, const real b, real tol = 0.0, const idx MAXIT = 100)
 {
     // Create a callable compliant with the Model Concept (f(x; a))
-    auto wrapped = [&](real x, Params) { return func(x) };
+    auto wrapped = [&](real x, Params) { return func(x); };
 
     // Dummy parameters
     const std::vector<real> empty {};
 
-    Bracket brack { bracket(func, empty, a, b) };
-    return golden_section(func, empty, brack, tol, MAXIT);
+    Bracket brack { bracket(wrapped, empty, a, b) };
+    return golden_section(wrapped, empty, brack, tol, MAXIT);
+}
+
+// Overload for passing a model that doesn't take parameters (and a bracket)
+template <UnaryModel F>
+MinResult1D golden_section(F&& func, Bracket brack, real tol = 0.0, const idx MAXIT = 100)
+{
+    // Create a callable compliant with the Model Concept (f(x; a))
+    auto wrapped = [&](real x, Params) { return func(x); };
+
+    // Dummy parameters
+    const std::vector<real> empty {};
+
+    return golden_section(wrapped, empty, brack, tol, MAXIT);
 }
 
 }

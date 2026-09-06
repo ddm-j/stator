@@ -269,6 +269,25 @@ FitResult fitmrq(
 }
 
 // Overload: User supplies ArgsVal, x, y, (scalar) sig, and a
+template <SensitivityModel F>
+FitResult fitmrq(
+    F&& func,
+    const std::vector<real>& x,
+    const std::vector<real>& y,
+    real sig_scalar,
+    std::vector<real> a,            // Parameter Vector is taken by copy
+    real tol = 0.0,
+    const idx MAXIT = 1000
+)
+{
+    // Create Sig & ia
+    const std::vector<real> sig(x.size(), sig_scalar);
+    const std::vector<bool> ia(a.size(), true);
+
+    return fitmrq(func, x, y, sig, a, ia, tol, MAXIT);
+}
+
+// Overload: User supplies ArgsVal, x, y, (scalar) sig, and a
 template <Model F>
 FitResult fitmrq(
     F&& func,

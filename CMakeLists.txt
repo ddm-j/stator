@@ -16,12 +16,20 @@ endif()
 
 # linalg dependency
 include(FetchContent)
-
 FetchContent_Declare(linalg
     GIT_REPOSITORY https://github.com/ddm-j/linalg.git
     GIT_TAG        262a2412063fe067d41adaf2322c669ba9582115
 )
 FetchContent_MakeAvailable(linalg)
+
+# pybind11
+FetchContent_Declare(pybind11
+    GIT_REPOSITORY https://github.com/pybind/pybind11.git
+    GIT_TAG        v2.13.6
+    GIT_SHALLOW    TRUE
+    SYSTEM
+)
+FetchContent_MakeAvailable(pybind11)
 
 # Libraries
 add_subdirectory(libs/core)
@@ -30,3 +38,6 @@ add_subdirectory(libs/physics)
 # Directories
 add_subdirectory(tests)
 add_subdirectory(scratch)
+
+# Python Bindings
+add_subdirectory(python)

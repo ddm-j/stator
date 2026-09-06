@@ -118,5 +118,21 @@ RootResult rtsafe(F&& func, Params a, const real x1, const real x2, const real x
     return rtsafe(nd, a, x1, x2, xacc, MAXIT);
 }
 
+// Overload without parameters
+template <UnaryModel F>
+RootResult rtsafe(F&& func, const real x1, const real x2, const real xacc = 0.0, const idx MAXIT = 100)
+{
+    // Create a callable compliant with the Model Concept (f(x; a))
+    auto wrapped = [&](real x, Params) { return func(x); };
+
+    // Converts "Model" to "DifferentiableModel" with forward differece numerical derivative
+    NumericalDerivative nd { wrapped };
+
+    // Dummy parameters
+    const std::vector<real> empty {};
+
+    return rtsafe(wrapped, empty, x1, x2, xacc, MAXIT);
+}
+
 }
 

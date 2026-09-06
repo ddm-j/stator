@@ -1,0 +1,12 @@
+[build-system]
+requires = ["scikit-build-core>=0.10"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "stator"
+version = "0.1.0"
+description = "Scientific computing library for roulette physics"
+requires-python = ">=3.9"
+
+[tool.scikit-build]
+wheel.packages = ["python/stator"]
