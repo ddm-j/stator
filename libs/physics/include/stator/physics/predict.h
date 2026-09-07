@@ -19,12 +19,12 @@ using namespace stator::core;
 
 namespace stator::physics {
 
-inline std::optional<real> predict_theta(const real To, const FitParams& params)
+inline std::optional<real> predict_theta(const real To, const real s, const FitParams& params)
 {
     // Unpack Fitted Params
     const real a { params.ball_params.a };
     const real b { params.ball_params.b };
-    const real phi { params.dep_params.phi };
+    const real phi { s * params.dep_params.delta };   // travel frame phase
     const real eta { params.dep_params.eta };
     const real omega_sq { params.dep_params.omega_sq };
 
@@ -73,12 +73,12 @@ inline std::optional<real> predict_theta(const real To, const FitParams& params)
 }
 
 // Time of Fall Prediction
-inline real predict_tf(const real To, const real theta, const FitParams& params)
+inline real predict_tf(const real To, const real theta, const real s, const FitParams& params)
 {
     // Unpack Fitted Params
     const real a { params.ball_params.a };
     const real b { params.ball_params.b };
-    const real phi { params.dep_params.phi };
+    const real phi { s * params.dep_params.delta };   // travel frame phase
     const real eta { params.dep_params.eta };
 
     // Useful Constants

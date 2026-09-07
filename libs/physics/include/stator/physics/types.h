@@ -17,12 +17,14 @@ struct BallTiming
     const std::vector<real> timestamps;
     const std::vector<real> tk;
     const real theta;
+    const real s;               // +1 clockwise, -1 anticlockwise
 
-    BallTiming(const std::string_view id, const std::vector<real>& ts, real theta)
+    BallTiming(const std::string_view id, const std::vector<real>& ts, real theta, real s = 1.0)
         : id { id }
         , timestamps { ts }
         , tk { timestamps_to_tk(ts) }
         , theta { theta + 2*pi*static_cast<real>(ts.size() - 1) }
+        , s { s }
     {}
 
 private:
@@ -44,7 +46,8 @@ struct BallParams
 
 struct DepartureParams
 {
-    real phi {};
+    real delta {};              // lab frame angle, reference mark to low point
+
     real eta {};
     real omega_sq {};
 };

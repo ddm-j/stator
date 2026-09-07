@@ -54,12 +54,12 @@ PYBIND11_MODULE(_stator, m)
     py::class_<DepartureParams>(m, "DepartureParams")
             .def(py::init<>())
             .def(py::init<real, real, real>(),
-                 py::arg("phi"), py::arg("eta"), py::arg("omega_sq"))
-            .def_readonly("phi", &DepartureParams::phi)
+                 py::arg("delta"), py::arg("eta"), py::arg("omega_sq"))
+            .def_readonly("delta", &DepartureParams::delta)
             .def_readonly("eta", &DepartureParams::eta)
             .def_readonly("omega_sq", &DepartureParams::omega_sq)
             .def("__repr__", [](const DepartureParams& p) {
-                return "DepartureParams(phi=" + std::to_string(p.phi)
+                return "DepartureParams(delta=" + std::to_string(p.delta)
                      + ", eta=" + std::to_string(p.eta)
                      + ", omega_sq=" + std::to_string(p.omega_sq) + ")";
             });
@@ -74,7 +74,7 @@ PYBIND11_MODULE(_stator, m)
             .def("__repr__", [](const FitParams& p) {
                 return "FitParams(a=" + std::to_string(p.ball_params.a)
                      + ", b=" + std::to_string(p.ball_params.b)
-                     + ", phi=" + std::to_string(p.dep_params.phi)
+                     + ", delta=" + std::to_string(p.dep_params.delta)
                      + ", eta=" + std::to_string(p.dep_params.eta)
                      + ", omega_sq=" + std::to_string(p.dep_params.omega_sq) + ")";
             });
@@ -95,26 +95,28 @@ PYBIND11_MODULE(_stator, m)
             .def(py::init<>())
             .def(py::init<idx, idx>(), py::arg("M"), py::arg("Y"))
             .def(py::init<real, real, real, real, real>(),
-                 py::arg("a"), py::arg("b"), py::arg("phi"),
+                 py::arg("a"), py::arg("b"), py::arg("delta"),
                  py::arg("eta"), py::arg("omega_sq"))
             .def("add_timing",
-                 [](Rim& rim, std::string_view id, std::vector<real> timestamps, real theta) {
-                     rim.add_timing(id, timestamps, theta);
+                 [](Rim& rim, std::string_view id, std::vector<real> timestamps, real theta, real s) {
+                     rim.add_timing(id, timestamps, theta, s);
                  },
-                 py::arg("id"), py::arg("timestamps"), py::arg("theta"))
+                 py::arg("id"), py::arg("timestamps"), py::arg("theta"), py::arg("s") = 1.0)
             .def("add_timing",
                  [](Rim& rim, std::vector<std::string> ids,
-                    std::vector<std::vector<real>> timestamps, std::vector<real> thetas) {
-                     rim.add_timing(ids, timestamps, thetas);
+                    std::vector<std::vector<real>> timestamps, std::vector<real> thetas,
+                    std::vector<real> ss) {
+                     rim.add_timing(ids, timestamps, thetas, ss);
                  },
-                 py::arg("ids"), py::arg("timestamps"), py::arg("thetas"))
+                 py::arg("ids"), py::arg("timestamps"), py::arg("thetas"),
+                 py::arg("ss") = std::vector<real>{})
             .def("fit", &Rim::fit)
             .def("predict",
-                 static_cast<std::optional<BallPrediction> (Rim::*)(const std::vector<real>&) const>(&Rim::predict),
-                 py::arg("tk"))
+                 static_cast<std::optional<BallPrediction> (Rim::*)(const std::vector<real>&, const real) const>(&Rim::predict),
+                 py::arg("tk"), py::arg("s") = 1.0)
             .def("predict",
-                 static_cast<std::vector<std::optional<BallPrediction>> (Rim::*)(const std::vector<std::vector<real>>&) const>(&Rim::predict),
-                 py::arg("tks"))
+                 static_cast<std::vector<std::optional<BallPrediction>> (Rim::*)(const std::vector<std::vector<real>>&, const std::vector<real>&) const>(&Rim::predict),
+                 py::arg("tks"), py::arg("ss") = std::vector<real>{})
             .def_property_readonly("params", &Rim::params)
             .def_property_readonly("lap_floor", &Rim::lap_floor)
             .def_property_readonly("a_slope", &Rim::a_slope)
@@ -122,7 +124,7 @@ PYBIND11_MODULE(_stator, m)
                 const FitParams& p { rim.params() };
                 return "Rim(a=" + std::to_string(p.ball_params.a)
                      + ", b=" + std::to_string(p.ball_params.b)
-                     + ", phi=" + std::to_string(p.dep_params.phi)
+                     + ", delta=" + std::to_string(p.dep_params.delta)
                      + ", eta=" + std::to_string(p.dep_params.eta)
                      + ", omega_sq=" + std::to_string(p.dep_params.omega_sq)
                      + ", lap_floor=" + std::to_string(rim.lap_floor()) + ")";
@@ -143,12 +145,14 @@ PYBIND11_MODULE(_stator, m)
     m.def("fit_departure", &fit_departure,
             py::arg("To"),
             py::arg("theta"),
+            py::arg("s"),
             py::arg("ball_params")
         );
     m.def("fit_departure_perspin", &fit_departure_perspin,
             py::arg("tks"),
             py::arg("To"),
             py::arg("theta"),
+            py::arg("s"),
             py::arg("ball_params")
         );
 
@@ -158,16 +162,17 @@ PYBIND11_MODULE(_stator, m)
     // need to outlive this call.
     m.def("make_departure_objective",
             [](real a, real b, const std::vector<real>& To,
-               const std::vector<real>& theta_f)
+               const std::vector<real>& theta_f, const std::vector<real>& s)
             {
                 return std::function<LinRegResult(real)>(
                         stator::physics::make_departure_objective(
-                                a, b, To, theta_f));
+                                a, b, To, theta_f, s));
             },
             py::arg("a"),
             py::arg("b"),
             py::arg("To"),
-            py::arg("theta_f")
+            py::arg("theta_f"),
+            py::arg("s")
         );
 
     // Per-spin overload of the same factory: one (a, b) per spin rather than
@@ -177,7 +182,8 @@ PYBIND11_MODULE(_stator, m)
     // call still matches the scalar overload first.
     m.def("make_departure_objective",
             [](const std::vector<real>& a, const std::vector<real>& b,
-               const std::vector<real>& To, const std::vector<real>& theta_f)
+               const std::vector<real>& To, const std::vector<real>& theta_f,
+               const std::vector<real>& s)
             {
                 if (a.size() != To.size() || b.size() != To.size())
                     throw std::invalid_argument(
@@ -185,17 +191,19 @@ PYBIND11_MODULE(_stator, m)
                             "must all be the same length");
                 return std::function<LinRegResult(real)>(
                         stator::physics::make_departure_objective(
-                                a, b, To, theta_f));
+                                a, b, To, theta_f, s));
             },
             py::arg("a"),
             py::arg("b"),
             py::arg("To"),
-            py::arg("theta_f")
+            py::arg("theta_f"),
+            py::arg("s")
         );
 
     // Theta Predictor
     m.def("predict_theta", &predict_theta,
             py::arg("To"),
+            py::arg("s"),
             py::arg("params")
         );
 
@@ -203,6 +211,7 @@ PYBIND11_MODULE(_stator, m)
     m.def("predict_tf", &predict_tf,
             py::arg("To"),
             py::arg("theta"),
+            py::arg("s"),
             py::arg("params")
         );
 
