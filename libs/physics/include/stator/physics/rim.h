@@ -16,6 +16,10 @@
 #include <stator/core/numeric_result.h>
 #include <stator/core/utility.h>
 
+#include <stator/physics/ball.h>
+#include <stator/physics/departure.h>
+#include <stator/physics/timing.h>
+#include <stator/physics/predict.h>
 #include <stator/physics/constants.h>
 #include <stator/physics/types.h>
 
@@ -33,14 +37,101 @@ public:
         , m_data { std::vector<BallTiming>{} }
     {}
     Rim() = default;
+    Rim(idx M, idx Y)
+        : m_M { M }
+        , m_Y { Y }
+    {}
 
     // Fitting
+    // M laps of lead time between the anchor and the drop, Y laps of To window
+    // before the anchor. a/b are fit on everything ahead of the To window, so
+    // each stage sees only what it would see live.
     void fit()
     {
         if (m_data.empty())
             return;
-        
+
+        // Ball Parameters, per spin
+        std::vector<real> as, bs, thetas;
+        std::vector<std::vector<real>> tks;
+        std::vector<idx> anchors;
+        for (const BallTiming& spin : m_data)
+        {
+            const idx n { spin.tk.size() };
+            if (n < m_M + m_Y + 1) continue;    // anchor must clear the To window
+
+            const idx anchor { n - 1 - m_M };
+            const auto beg { spin.tk.begin() };
+
+            const BallParams p { fit_ab(spin.tk) };         // pooled constant, use every lap
+            if ((p.a <= 0.0) || (p.b == 0.0)) continue;     // degenerate fit
+
+            as.push_back(p.a);
+            bs.push_back(std::abs(p.b));                    // sign of b is not identified
+            tks.emplace_back(beg, beg + static_cast<std::ptrdiff_t>(anchor) + 1);
+            anchors.push_back(anchor);
+            thetas.push_back(spin.theta);
+        }
+        if (as.empty())
+            throw ConvergenceFailure("Rim.fit(): no spin produced usable ball parameters");
+
+        // Pool
+        const BallParams ball { detail::median(as), detail::median(bs) };
+
+        // To Estimator Constants
+        m_lap_floor = fit_lap_floor(tks, m_Y);
+        m_a_slope = ball.a;
+
+        // To and Departure Angle, both referenced to the anchor
+        std::vector<real> To, theta;
+        for (idx j {}; j < tks.size(); j++)
+        {
+            To.push_back(estimate_To(tks[j], anchors[j], m_lap_floor, m_a_slope, m_Y));
+            theta.push_back(thetas[j] - 2*pi*static_cast<real>(anchors[j]));
+        }
+
+        // Fit Departure
+        m_params = { ball, fit_departure(To, theta, ball) };
     }
+
+    // Prediction
+    // tk's LAST crossing is the anchor. To is the lap the ball is on now,
+    // extrapolated from the Y laps behind it, matching how fit() built To[].
+    std::optional<BallPrediction> predict(const std::vector<real>& tk) const
+    {
+        if (m_params.ball_params.a <= 0.0)
+            throw InvalidArgument("Rim.predict(): rim has not been fit");
+
+        const idx n { tk.size() };
+        if (n < m_Y + 1)
+            throw InvalidArgument("Rim.predict(): need {} crossings for a {} lap window, got {}",
+                                  m_Y + 1, m_Y, n);
+
+        // Trim off the front, the To estimator only wants the last Y laps
+        const std::vector<real> tk_win(tk.end() - static_cast<std::ptrdiff_t>(m_Y) - 1, tk.end());
+        const idx m { tk_win.size() - 1 };
+
+        const real To { estimate_To(tk_win, m, m_lap_floor, m_a_slope, m_Y) };
+        const std::optional<real> theta { predict_theta(To, m_params) };
+        if (!theta)
+            return std::nullopt;
+
+        return BallPrediction { *theta, predict_tf(To, *theta, m_params) };
+    }
+
+    std::vector<std::optional<BallPrediction>> predict(const std::vector<std::vector<real>>& tks) const
+    {
+        std::vector<std::optional<BallPrediction>> res;
+        res.reserve(tks.size());
+        for (const std::vector<real>& tk : tks)
+            res.push_back(predict(tk));
+        return res;
+    }
+
+    // Accessors
+    const FitParams& params() const { return m_params; }
+    real lap_floor() const { return m_lap_floor; }
+    real a_slope() const { return m_a_slope; }
 
     // Utility
     void add_timing(std::string_view id, std::vector<real>& timestamps, real theta)
@@ -69,6 +160,10 @@ private:
     FitParams m_params {};
 
     // Consts
+    idx m_M { 4 };              // lead laps between the anchor and the drop
+    idx m_Y { 6 };              // To estimator window, in laps
+    real m_lap_floor {};
+    real m_a_slope {};
 
     // Data
     std::vector<BallTiming> m_data;

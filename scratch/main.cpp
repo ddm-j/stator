@@ -28,13 +28,19 @@ int main()
 
     auto theta1 { predict_theta(To1, params) };
     if (theta1.has_value())
-        std::cout << std::format("Case 1: theta = {}\n", theta1.value());
+    {
+        const real t_f { predict_tf(To1, theta1.value(), params) };
+        std::cout << std::format("Case 1: theta = {}, t_f = {}s\n", theta1.value(), t_f);
+    }
     else
         std::cout << "Failed to find departure theta\n";
 
     auto theta2 { predict_theta(To2, params) };
     if (theta2.has_value())
-        std::cout << std::format("Case 1: theta = {}\n", theta2.value());
+    {
+        const real t_f { predict_tf(To2, theta2.value(), params) };
+        std::cout << std::format("Case 2: theta = {}, t_f = {}s\n", theta2.value(), t_f);
+    }
     else
         std::cout << "Failed to find departure theta\n";
 

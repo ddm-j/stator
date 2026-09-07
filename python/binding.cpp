@@ -14,6 +14,7 @@
 #include <stator/physics/departure.h>
 #include <stator/physics/rim.h>
 #include <stator/physics/predict.h>
+#include <stator/physics/timing.h>
 
 namespace py = pybind11;
 
@@ -78,6 +79,55 @@ PYBIND11_MODULE(_stator, m)
                      + ", omega_sq=" + std::to_string(p.dep_params.omega_sq) + ")";
             });
     
+    // Ball Prediction
+    py::class_<BallPrediction>(m, "BallPrediction")
+            .def(py::init<>())
+            .def(py::init<real, real>(), py::arg("theta"), py::arg("t_f"))
+            .def_readonly("theta", &BallPrediction::theta)
+            .def_readonly("t_f", &BallPrediction::t_f)
+            .def("__repr__", [](const BallPrediction& p) {
+                return "BallPrediction(theta=" + std::to_string(p.theta)
+                     + ", t_f=" + std::to_string(p.t_f) + ")";
+            });
+
+    // Rim
+    py::class_<Rim>(m, "Rim")
+            .def(py::init<>())
+            .def(py::init<idx, idx>(), py::arg("M"), py::arg("Y"))
+            .def(py::init<real, real, real, real, real>(),
+                 py::arg("a"), py::arg("b"), py::arg("phi"),
+                 py::arg("eta"), py::arg("omega_sq"))
+            .def("add_timing",
+                 [](Rim& rim, std::string_view id, std::vector<real> timestamps, real theta) {
+                     rim.add_timing(id, timestamps, theta);
+                 },
+                 py::arg("id"), py::arg("timestamps"), py::arg("theta"))
+            .def("add_timing",
+                 [](Rim& rim, std::vector<std::string> ids,
+                    std::vector<std::vector<real>> timestamps, std::vector<real> thetas) {
+                     rim.add_timing(ids, timestamps, thetas);
+                 },
+                 py::arg("ids"), py::arg("timestamps"), py::arg("thetas"))
+            .def("fit", &Rim::fit)
+            .def("predict",
+                 static_cast<std::optional<BallPrediction> (Rim::*)(const std::vector<real>&) const>(&Rim::predict),
+                 py::arg("tk"))
+            .def("predict",
+                 static_cast<std::vector<std::optional<BallPrediction>> (Rim::*)(const std::vector<std::vector<real>>&) const>(&Rim::predict),
+                 py::arg("tks"))
+            .def_property_readonly("params", &Rim::params)
+            .def_property_readonly("lap_floor", &Rim::lap_floor)
+            .def_property_readonly("a_slope", &Rim::a_slope)
+            .def("__repr__", [](const Rim& rim) {
+                const FitParams& p { rim.params() };
+                return "Rim(a=" + std::to_string(p.ball_params.a)
+                     + ", b=" + std::to_string(p.ball_params.b)
+                     + ", phi=" + std::to_string(p.dep_params.phi)
+                     + ", eta=" + std::to_string(p.dep_params.eta)
+                     + ", omega_sq=" + std::to_string(p.dep_params.omega_sq)
+                     + ", lap_floor=" + std::to_string(rim.lap_floor()) + ")";
+            });
+
     // A B Parameter Fitter
     m.def("fit_ab", &fit_ab,
             py::arg("tk")
@@ -147,6 +197,35 @@ PYBIND11_MODULE(_stator, m)
     m.def("predict_theta", &predict_theta,
             py::arg("To"),
             py::arg("params")
+        );
+
+    // Time of Fall Predictor
+    m.def("predict_tf", &predict_tf,
+            py::arg("To"),
+            py::arg("theta"),
+            py::arg("params")
+        );
+
+    // To Estimator and its calibration. Bound so the anchor/window sweeps can
+    // be driven from python without going through Rim.
+    m.def("lap_durations", &lap_durations,
+            py::arg("tk")
+        );
+    m.def("lap_curvature", &lap_curvature,
+            py::arg("dT"),
+            py::arg("lap_floor")
+        );
+    m.def("estimate_To", &estimate_To,
+            py::arg("tk"),
+            py::arg("m"),
+            py::arg("lap_floor"),
+            py::arg("a_slope"),
+            py::arg("N")
+        );
+    m.def("fit_lap_floor", &fit_lap_floor,
+            py::arg("tks"),
+            py::arg("N"),
+            py::arg("N_scan") = 60
         );
 
     // // // Ball Timing Model

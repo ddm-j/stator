@@ -13,6 +13,7 @@
 #include <stator/core/rtsafe.h>
 
 #include <stator/physics/types.h>
+#include <stator/physics/ball.h>
 
 using namespace stator::core;
 
@@ -70,5 +71,33 @@ inline std::optional<real> predict_theta(const real To, const FitParams& params)
     }
     return std::nullopt; // no root found over [theta_hi, theta_lo]
 }
+
+// Time of Fall Prediction
+inline real predict_tf(const real To, const real theta, const FitParams& params)
+{
+    // Unpack Fitted Params
+    const real a { params.ball_params.a };
+    const real b { params.ball_params.b };
+    const real phi { params.dep_params.phi };
+    const real eta { params.dep_params.eta };
+
+    // Useful Constants
+    const real x  { (std::exp(2*pi*a) - std::cosh(a*b*To)) / std::sinh(a*b*To) };
+    const real c0 { -acoth(x) };
+    const real c1 { b*b*(x*x - 1) };
+
+    // Fall Time
+    const real t_f = {
+        (1.0/(a*b))*(c0 - std::asinh(std::sinh(c0)*std::exp(a*theta))) - 
+        (eta/2.0)*((std::sin(theta+phi) + 2*a*std::cos(theta+phi)) /
+        std::sqrt(std::pow(c1*std::exp(-2*a*theta)+b*b,3)))
+    };
+    return t_f;
+}
+
+// inline BallPrediction predict(const real To, const FitParams& params)
+// {
+
+// };
 
 }

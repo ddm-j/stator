@@ -55,4 +55,10 @@ struct FitParams
     DepartureParams dep_params {};
 };
 
+struct BallPrediction
+{
+    real theta {};
+    real t_f {};
+};
+
 }
