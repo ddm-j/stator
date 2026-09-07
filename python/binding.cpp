@@ -13,6 +13,7 @@
 #include <stator/physics/ball.h>
 #include <stator/physics/departure.h>
 #include <stator/physics/rim.h>
+#include <stator/physics/rotor.h>
 #include <stator/physics/predict.h>
 #include <stator/physics/timing.h>
 
@@ -235,6 +236,11 @@ PYBIND11_MODULE(_stator, m)
             py::arg("tks"),
             py::arg("N"),
             py::arg("N_scan") = 60
+        );
+
+    // Rotor Decay Fitter
+    m.def("fit_rotor", &fit_rotor,
+            py::arg("ts")
         );
 
     // // // Ball Timing Model
