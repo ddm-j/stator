@@ -4,6 +4,8 @@
 
 #include <linalg/Matrix.h>
 
+#include <stator/core/types.h>
+
 namespace stator::core {
 
 // Linear Regression Result

@@ -21,22 +21,37 @@ int main()
     using namespace stator::core;
     using namespace stator::physics;
 
-    std::vector<std::vector<double>> rotor_timings = {
-        {1873.4120, 1875.8410, 1878.3404, 1880.9373, 1883.6812, 1886.5504,
-         1889.5597, 1892.7528, 1896.1539, 1899.8167},
-        {204.8700, 208.2023, 211.7746, 215.6827, 219.9844, 224.8621},
-        {3320.1550, 3322.9211, 3325.8180, 3328.8947, 3332.1245, 3335.6073,
-         3339.3589, 3343.4914},
-        {912.0060, 915.7339, 919.7824, 924.3381, 929.6055},
-        {55.7300, 57.9747, 60.3026, 62.7036, 65.2266, 67.8267,
-         70.5098, 73.3382, 76.3337, 79.4920, 82.8505, 86.4743},
-        {2461.2980, 2464.4068, 2467.7432, 2471.3125, 2475.1906, 2479.4357, 2484.2882},
+    Wheel wheel { Wheel::American() };
+    std::vector<std::string> numbers {"0", "1", "35", "28", "00", "2"};
+    for (const auto& s: numbers)
+    {
+        std::cout << std::format("The index and angle of {} is: {} - {}\n", s, wheel.get_pkt_index(s).value(), wheel.get_pkt_angle(s).value());
+    }
+
+    std::vector<real> angles { 
+        0.08267349088394192, 3.058919162705851, 5.869817852759876, 0.24802047265182575, 3.224266144473735, 6.200511816295644
     };
+    for (const auto& ang: angles)
+    {
+        std::cout << std::format("The pocket at angle {} is {}\n", ang, wheel.get_pkt_from_angle(ang-2*pi));
+    }
 
-    auto [k, sig_k_k] = fit_rotor(rotor_timings);
+    // std::vector<std::vector<double>> rotor_timings = {
+    //     {1873.4120, 1875.8410, 1878.3404, 1880.9373, 1883.6812, 1886.5504,
+    //      1889.5597, 1892.7528, 1896.1539, 1899.8167},
+    //     {204.8700, 208.2023, 211.7746, 215.6827, 219.9844, 224.8621},
+    //     {3320.1550, 3322.9211, 3325.8180, 3328.8947, 3332.1245, 3335.6073,
+    //      3339.3589, 3343.4914},
+    //     {912.0060, 915.7339, 919.7824, 924.3381, 929.6055},
+    //     {55.7300, 57.9747, 60.3026, 62.7036, 65.2266, 67.8267,
+    //      70.5098, 73.3382, 76.3337, 79.4920, 82.8505, 86.4743},
+    //     {2461.2980, 2464.4068, 2467.7432, 2471.3125, 2475.1906, 2479.4357, 2484.2882},
+    // };
 
-    std::cout << std::format("Rotor decay constant: {}\n", k);
-    std::cout << std::format("Relative Error: {}", sig_k_k);
+    // auto [k, sig_k_k] = fit_rotor(rotor_timings);
+
+    // std::cout << std::format("Rotor decay constant: {}\n", k);
+    // std::cout << std::format("Relative Error: {}", sig_k_k);
 
     // FitParams params {
     //     BallParams(0.0225, 1.8257419),

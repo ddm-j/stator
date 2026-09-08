@@ -64,4 +64,24 @@ struct BallPrediction
     real t_f {};
 };
 
+struct WheelTiming
+{
+    const std::string id;
+    const std::vector<real> timestamps;
+
+    WheelTiming(const std::string_view id, const std::vector<real>& ts)
+        : id { id }
+        , timestamps { ts }
+    {}
+};
+
+struct Prediction
+{
+    real departure_time {}; // Absolute time (not relative) of ball departure from rim
+    real ball_travel {};     // Ball angular travel distance (radians, unsigned, arc-length CS)
+    real wheel_travel {};    // Wheel angular travel distance (radians, unsigned)
+    real wheel_angle {};    // Ball location in wheel frame at departure
+    std::string_view pocket {}; // Pocket corresponding to wheel angle
+};
+
 }

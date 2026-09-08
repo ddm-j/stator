@@ -95,9 +95,4 @@ inline real predict_tf(const real To, const real theta, const real s, const FitP
     return t_f;
 }
 
-// inline BallPrediction predict(const real To, const FitParams& params)
-// {
-
-// };
-
 }

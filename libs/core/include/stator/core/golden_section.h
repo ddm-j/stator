@@ -5,6 +5,7 @@
 #include <tuple>
 #include <cmath>
 #include <iostream>
+#include <cassert>
 
 #include "stator/core/types.h"
 #include "stator/core/constants.h"

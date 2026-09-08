@@ -98,8 +98,17 @@ public:
     // Prediction
     // tk's LAST crossing is the anchor. To is the lap the ball is on now,
     // extrapolated from the Y laps behind it, matching how fit() built To[].
-    std::optional<BallPrediction> predict(const std::vector<real>& tk, const real s = 1.0) const
+    std::optional<BallPrediction> predict(const std::vector<real>& timestamps, const real s = 1.0) const
     {
+        // Difference Timestamps to get tk
+        std::vector<real> tk(timestamps.size(), 0.0);
+        for (idx j {}; j < timestamps.size(); j++)
+        {
+            if ((j > 0) && (timestamps[j] <= timestamps[j-1]))
+                throw InvalidArgument("Rim.predict(): ball lap timestamps are non-monotonic.");
+            tk[j] = timestamps[j] - timestamps[0];
+        }
+
         if (m_params.ball_params.a <= 0.0)
             throw InvalidArgument("Rim.predict(): rim has not been fit");
 

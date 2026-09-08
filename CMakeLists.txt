@@ -37,6 +37,7 @@ add_subdirectory(libs/physics)
 
 # Directories
 add_subdirectory(tests)
+add_subdirectory(header_selftest)
 add_subdirectory(scratch)
 
 # Python Bindings

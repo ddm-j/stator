@@ -13,8 +13,9 @@
 #include <stator/physics/ball.h>
 #include <stator/physics/departure.h>
 #include <stator/physics/rim.h>
-#include <stator/physics/rotor.h>
+#include <stator/physics/wheel.h>
 #include <stator/physics/predict.h>
+#include <stator/physics/predictor.h>
 #include <stator/physics/timing.h>
 
 namespace py = pybind11;
@@ -91,6 +92,25 @@ PYBIND11_MODULE(_stator, m)
                      + ", t_f=" + std::to_string(p.t_f) + ")";
             });
 
+    // Prediction (what Predictor returns: the full stitched result)
+    py::class_<Prediction>(m, "Prediction")
+            .def(py::init<>())
+            .def_readonly("departure_time", &Prediction::departure_time)
+            .def_readonly("ball_travel", &Prediction::ball_travel)
+            .def_readonly("wheel_travel", &Prediction::wheel_travel)
+            .def_readonly("wheel_angle", &Prediction::wheel_angle)
+            // pocket is a string_view into the static layout table; hand python
+            // an owned str rather than a view.
+            .def_property_readonly("pocket",
+                 [](const Prediction& p) { return std::string(p.pocket); })
+            .def("__repr__", [](const Prediction& p) {
+                return "Prediction(pocket=" + std::string(p.pocket)
+                     + ", departure_time=" + std::to_string(p.departure_time)
+                     + ", ball_travel=" + std::to_string(p.ball_travel)
+                     + ", wheel_travel=" + std::to_string(p.wheel_travel)
+                     + ", wheel_angle=" + std::to_string(p.wheel_angle) + ")";
+            });
+
     // Rim
     py::class_<Rim>(m, "Rim")
             .def(py::init<>())
@@ -114,10 +134,10 @@ PYBIND11_MODULE(_stator, m)
             .def("fit", &Rim::fit)
             .def("predict",
                  static_cast<std::optional<BallPrediction> (Rim::*)(const std::vector<real>&, const real) const>(&Rim::predict),
-                 py::arg("tk"), py::arg("s") = 1.0)
+                 py::arg("timestamps"), py::arg("s") = 1.0)
             .def("predict",
                  static_cast<std::vector<std::optional<BallPrediction>> (Rim::*)(const std::vector<std::vector<real>>&, const std::vector<real>&) const>(&Rim::predict),
-                 py::arg("tks"), py::arg("ss") = std::vector<real>{})
+                 py::arg("timestamps"), py::arg("ss") = std::vector<real>{})
             .def_property_readonly("params", &Rim::params)
             .def_property_readonly("lap_floor", &Rim::lap_floor)
             .def_property_readonly("a_slope", &Rim::a_slope)
@@ -129,6 +149,58 @@ PYBIND11_MODULE(_stator, m)
                      + ", eta=" + std::to_string(p.dep_params.eta)
                      + ", omega_sq=" + std::to_string(p.dep_params.omega_sq)
                      + ", lap_floor=" + std::to_string(rim.lap_floor()) + ")";
+            });
+
+    // Wheel
+    // No public constructor: build one with Wheel.American() / Wheel.European().
+    // predict/add_timing take non-const vector refs in C++, so the lambdas take
+    // their vectors by value and pass those lvalues through.
+    py::class_<Wheel>(m, "Wheel")
+            .def_static("American", &Wheel::American)
+            .def_static("European", &Wheel::European)
+            .def("add_timing",
+                 [](Wheel& wheel, std::string_view id, std::vector<real> timestamps) {
+                     wheel.add_timing(id, timestamps);
+                 },
+                 py::arg("id"), py::arg("timestamps"))
+            .def("add_timing",
+                 [](Wheel& wheel, std::vector<std::string> ids,
+                    std::vector<std::vector<real>> timestamps) {
+                     wheel.add_timing(ids, timestamps);
+                 },
+                 py::arg("ids"), py::arg("timestamps"))
+            .def("fit", &Wheel::fit)
+            .def("predict",
+                 [](const Wheel& wheel, std::vector<real> timestamps, real t_drop) {
+                     return wheel.predict(timestamps, t_drop);
+                 },
+                 py::arg("timestamps"), py::arg("t_drop"))
+            .def("get_pkt_index", &Wheel::get_pkt_index, py::arg("pocket"))
+            .def("get_pkt_angle", &Wheel::get_pkt_angle, py::arg("pocket"))
+            .def("get_pkt_from_angle", &Wheel::get_pkt_from_angle, py::arg("angle"))
+            .def_property_readonly("n", &Wheel::get_n)
+            .def_property_readonly("decay_k", &Wheel::get_decay_k)
+            .def_property_readonly("pkt_ang", &Wheel::get_pkt_ang)
+            .def("__repr__", [](const Wheel& wheel) {
+                return "Wheel(pockets=" + std::to_string(wheel.get_n())
+                     + ", decay_k=" + std::to_string(wheel.get_decay_k()) + ")";
+            });
+
+    // Predictor
+    // Takes a fitted Rim and Wheel by value, so the python objects stay usable
+    // and independent afterwards. Both senses are required: nothing assumes the
+    // ball and rotor counter-rotate.
+    py::class_<Predictor>(m, "Predictor")
+            .def(py::init<Rim, Wheel>(), py::arg("rim"), py::arg("wheel"))
+            .def("predict",
+                 [](const Predictor& pred, std::vector<real> ball_ts,
+                    std::vector<real> wheel_ts, real ball_sense, real wheel_sense) {
+                     return pred.predict(ball_ts, wheel_ts, ball_sense, wheel_sense);
+                 },
+                 py::arg("ball_ts"), py::arg("wheel_ts"),
+                 py::arg("ball_sense"), py::arg("wheel_sense"))
+            .def("__repr__", [](const Predictor&) {
+                return std::string("Predictor()");
             });
 
     // A B Parameter Fitter
@@ -239,8 +311,18 @@ PYBIND11_MODULE(_stator, m)
         );
 
     // Rotor Decay Fitter
-    m.def("fit_rotor", &fit_rotor,
-            py::arg("ts")
+    // Takes a list of per-spin timestamp lists. WheelTiming is an internal type,
+    // so the ids it carries are synthesised here rather than exposed; fit_rotor
+    // never reads them. Returns (k [rad/s^2], relative sigma of k).
+    m.def("fit_rotor",
+            [](const std::vector<std::vector<real>>& timestamps) {
+                std::vector<WheelTiming> timings;
+                timings.reserve(timestamps.size());
+                for (idx j {}; j < timestamps.size(); j++)
+                    timings.emplace_back(std::to_string(j), timestamps[j]);
+                return stator::physics::fit_rotor(timings);
+            },
+            py::arg("timestamps")
         );
 
     // // // Ball Timing Model
