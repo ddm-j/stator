@@ -27,8 +27,8 @@ public:
     std::optional<Prediction> predict(std::vector<real>& ball_ts, std::vector<real>& wheel_ts, const real ball_sense, const real wheel_sense) const
     {
         // Makes a roulette prediction based on ball timings and wheel timings
-        if (ball_ts.front() < wheel_ts.back())
-            throw InvalidArgument("Predictor.predict(): ball timestamps cannot come before wheel timestamps.");
+        // if (ball_ts.front() < wheel_ts.back())
+        //     throw InvalidArgument("Predictor.predict(): ball timestamps cannot come before wheel timestamps.");
         
         // Predict Ball Position
         std::optional<BallPrediction> ball_pred { m_rim.predict(ball_ts, ball_sense) };

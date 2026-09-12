@@ -1,0 +1,14 @@
+[project]
+name = "strike_fit"
+version = "0.1.0"
+description = "Strike-fit viability study: Eichberger rim model calibrated from lap and deflector-strike clicks only"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "matplotlib>=3.8",
+    "pytest>=8",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
