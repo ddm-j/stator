@@ -22,6 +22,7 @@ from stator import Wheel  # the rotor stage and pocket table, unchanged
 
 from .calibrate import (CalibrationConfig, StrikeCalibration, StrikeObservations,
                         calibrate, profile)
+from .crossval import FoldResult, cross_validate, leave_one_out
 from .predictor import Prediction, Predictor
 from .rim import (DescentParams, StrikeFitParams, StrikePrediction, StrikeRim,
                   StrikeTiming, deflector_from_travel_angle, deflector_travel_angle,
@@ -32,5 +33,6 @@ __all__ = [
     "StrikeFitParams", "DescentParams", "StrikeTiming",
     "CalibrationConfig", "StrikeCalibration", "StrikeObservations",
     "calibrate", "profile",
+    "cross_validate", "leave_one_out", "FoldResult",
     "deflector_travel_angle", "deflector_from_travel_angle", "strike_deflector",
 ]

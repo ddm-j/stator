@@ -37,7 +37,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from scipy.optimize import minimize
 
-from . import model
+from . import _kernels, model
 from .conventions import OMEGA_F_SQ, TWO_PI, mad_scale  # noqa: F401
 
 # ``A0`` and ``C0`` are effective offsets, not measurements of the descent.
@@ -245,12 +245,25 @@ def calibrate(obs: StrikeObservations, a: float, b: float,
         v = x * scale
         return float(v[0]), float(v[1]), (float(v[2]) if cfg.fit_omega_sq else w_held)
 
+    # The search runs on the compiled kernels, which reproduce ``evaluate``'s
+    # objective; ``evaluate`` itself is kept for the diagnostics of the answer.
+    # The grid's forward model does not depend on the residual scales, so it is
+    # solved once and only rescored by the second pass.
+    f64 = lambda x: np.ascontiguousarray(x, dtype=float)
+    omega0 = f64(model.omega0_from_first_lap(obs.To, a, b))
+    s_arr, theta_s, t_s = f64(obs.s), f64(obs.theta_s), f64(obs.t_s)
+    a, b = float(a), float(b)
+    A0_lo, A0_hi = cfg.A0_bounds if cfg.A0_bounds is not None else (0.0, 0.0)
+    C0_lo, C0_hi = cfg.C0_bounds if cfg.C0_bounds is not None else (0.0, 0.0)
+    switches = (bool(cfg.use_angle_channel), bool(cfg.use_time_channel),
+                float(A0_lo), float(A0_hi), cfg.A0_bounds is not None,
+                float(C0_lo), float(C0_hi), cfg.C0_bounds is not None)
+    cached_gaps = _kernels.grid_gaps(omega0, s_arr, theta_s, t_s, a, b, f64(cfg.delta_grid),
+                                     f64(cfg.eta_grid), f64(w_grid))
+
     def run(s_theta, s_t):
-        grid = np.empty((cfg.delta_grid.size, cfg.eta_grid.size, w_grid.size))
-        for i, delta in enumerate(cfg.delta_grid):
-            for j, eta in enumerate(cfg.eta_grid):
-                for k, wsq in enumerate(w_grid):
-                    grid[i, j, k] = evaluate(obs, a, b, delta, eta, wsq, s_theta, s_t, cfg).S
+        grid = _kernels.grid_scores(cached_gaps, s_arr, f64(w_grid), float(s_theta), float(s_t),
+                                    *switches)
         best = None
         for flat in np.argsort(grid, axis=None)[: max(1, cfg.n_starts)]:
             i, j, k = np.unravel_index(flat, grid.shape)
@@ -262,7 +275,8 @@ def calibrate(obs: StrikeObservations, a: float, b: float,
                 delta, eta, omega_sq = unpack(x, w_held)
                 if eta < 0.0 or eta > cfg.eta_max or omega_sq <= w_floor:
                     return 1e30
-                return evaluate(obs, a, b, delta, eta, omega_sq, s_theta, s_t, cfg).S
+                return _kernels.objective(omega0, s_arr, theta_s, t_s, a, b, delta, eta,
+                                          omega_sq, float(s_theta), float(s_t), *switches)
 
             simplex = [x0] + [x0 + np.eye(n_free)[t] for t in range(n_free)]
             r = minimize(objective, x0, method="Nelder-Mead",

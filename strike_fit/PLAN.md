@@ -103,10 +103,48 @@ the time channel discriminates better. And the tilt runs to whatever ceiling
 it is given, trading against `omega_sq` along a near-flat ridge, so it is not
 identified on this data. `calibration.eta_at_bound` reports when that happens.
 
+## Speed
+
+The calibration objective is evaluated about ten thousand times per fit. Its
+search runs on numba kernels in `_kernels.py`, which repeat `model.exit_angle`,
+`model.fall_time` and `calibrate.evaluate` per spin; `tests/test_kernels.py`
+pins them to the numpy forms, which remain the reference and still produce the
+final diagnostics. The one algorithmic difference is the root polish: the
+kernel uses safeguarded Newton (as `core/rtsafe.h`) where `model.exit_angle`
+bisects, and the roots agree to about 1e-13 rad. The grid's forward model is
+solved once per fit (in parallel) and only rescored by the rescaled second
+pass.
+
+Held-out evaluation lives in `crossval.py`. `leave_one_out` and
+`cross_validate` refit per fold and predict the held-out spins live, one
+process per fold; results are identical for any worker count. Scripts calling
+them need an `if __name__ == "__main__":` guard, because workers are spawned.
+
+    results = leave_one_out(ids, crossings, t_strikes, deflectors, senses)
+    summary(results)        # hit rate, median |dt|, errors
+
+| | before | now |
+|---|---|---|
+| one fit, rc_208 (55 strikes) | 11.3 s | 0.2 s |
+| leave-one-out, rc_208, 55 folds | ~11 min | 2.3 s |
+| leave-one-out, synthetic 200 spins, 191 folds | ~1 h | 12 s |
+
+Nelder-Mead on the L1 surface amplifies last-digit rounding: perturbing `To`
+by 1e-14 moves the rescaled `s_t` of some leave-one-out folds in the fourth
+digit, with the old code as with the new. Compare predictions, not a fold's
+scales, when checking a change against a recording.
+
+`tools/bench.py` times a fit and a leave-one-out and records or checks every
+fitted number and held-out prediction:
+
+    python -m strike_fit.tools.bench --data strike_fit/out/rc_208.jsonl --folds 8 --record out/golden.json
+    python -m strike_fit.tools.bench --data strike_fit/out/rc_208.jsonl --folds 8 --check out/golden.json
+
 ## Environment
 
-Requires `stator`, so it runs in the `roulette-timings` venv where stator is
-installed. Tests: `python -m pytest strike_fit/tests` from the repo root.
+Requires `stator` and `numba`, so it runs in the `roulette-timings` venv where
+stator is installed. Tests: `python -m pytest strike_fit/tests` from the repo
+root. The first import compiles the kernels and caches them in `__pycache__`.
 
 `tools/convert_measurements.py` and `data.py` produce JSONL, used as a test
 fixture only. The API consumes raw arrays; JSONL is not a pipeline stage.
