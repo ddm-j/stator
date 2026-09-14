@@ -28,6 +28,12 @@ M, Y = 4, 6
 # Fixtures: one synthetic corpus, and a rotor
 # ----------------------------------------------------------------------------
 
+def departure_input(rec):
+    """stator.Rim's departure input from synthetic truth: crossings through the exit lap, total travel."""
+    travel = rec["truth"]["theta_f"]
+    return rec["clicks_s"][: int(travel // TWO_PI) + 1], travel
+
+
 @pytest.fixture(scope="module")
 def spins():
     ds = synth.generate(120, eta=0.2, seed=21)
@@ -35,12 +41,11 @@ def spins():
     for rec in ds.records:
         s = 1.0 if rec["direction"] == "cw" else -1.0
         st = rec["strike"]
-        # what stator would be handed for the same spin: the lab-frame departure
-        # angle inside the final revolution
-        bin_ = rec["legacy"]["angle_bin"]
-        theta_lab = TWO_PI * (bin_ - 0.5) / 36.0
+        # what stator would be handed for the same spin: crossings through the
+        # departure's lap, and total travel to departure in the travel frame
+        ts_dep, travel = departure_input(rec)
         out.append({"id": rec["spin_id"], "ts": rec["clicks_s"], "s": s,
-                    "theta": theta_lab,
+                    "ts_dep": ts_dep, "travel": travel,
                     "t_strike": st["t_s"] if st else None,
                     "deflector": st["deflector"] if st else None})
     return out
@@ -127,7 +132,9 @@ def test_backbone_matches_stator_rim(spins):
     ref = stator.Rim(M, Y)
     sib = StrikeRim(M=M, Y=Y, n_deflectors=8)
     for sp in spins:
-        ref.add_timing(sp["id"], sp["ts"], sp["theta"], sp["s"])
+        if len(sp["ts"]) != len(sp["ts_dep"]):
+            continue    # crossings past rim exit: stator needs them trimmed, the sibling does not
+        ref.add_timing(sp["id"], sp["ts"], sp["travel"], sp["s"])
         sib.add_timing(sp["id"], sp["ts"], sp["t_strike"], sp["deflector"], sp["s"])
     ref.fit()
     sib.fit()
@@ -159,6 +166,52 @@ def test_backbone_ignores_the_calibration_channel(spins):
     # the backbone still ran before the calibration refused
     assert laps_only.lap_floor == with_strikes.lap_floor
     assert laps_only.a_slope == with_strikes.a_slope
+
+
+# ----------------------------------------------------------------------------
+# Departure calibration: stator's own, on multi-lap spins
+# ----------------------------------------------------------------------------
+
+@pytest.fixture(scope="module")
+def departure_corpus():
+    # click noise on purpose: noise-free, the L1 fit lets a perfectly consistent
+    # half of the spins outvote a wrong half, and bad input looks calibrated
+    return synth.generate(600, eta=0.2, seed=3, sigma_click=0.03, p_hover=0.0, p_missing=0.0).records
+
+
+def fit_stator_departure(records, travel_frame=True):
+    rim = stator.Rim(M, Y)
+    for rec in records:
+        s = 1.0 if rec["direction"] == "cw" else -1.0
+        ts, travel = departure_input(rec)
+        if not travel_frame:    # the old fixture's mistake: the angle read on the wheel, direction ignored
+            travel = TWO_PI * (len(ts) - 1) + (s * travel) % TWO_PI
+        rim.add_timing(rec["spin_id"], ts, travel, s)
+    rim.fit()
+    return rim.params.dep_params
+
+
+def test_stator_departure_fit_recovers_truth(departure_corpus):
+    p = fit_stator_departure(departure_corpus)
+    assert p.delta == pytest.approx(DELTA, abs=0.05)
+    assert p.eta == pytest.approx(ETA, abs=0.03)
+    assert p.omega_sq == pytest.approx(OMEGA_SQ, rel=0.05)
+
+
+def test_stator_departure_fit_breaks_on_lab_frame_angles(departure_corpus):
+    p = fit_stator_departure(departure_corpus, travel_frame=False)
+    assert abs(p.delta - DELTA) > 0.2 or abs(p.eta - ETA) > 0.05
+
+
+def test_stator_refuses_crossings_past_departure(departure_corpus):
+    """Every click through the strike with the departure's travel is a 2*pi error; stator must say so."""
+    past = [rec for rec in departure_corpus if len(rec["clicks_s"]) > len(departure_input(rec)[0])]
+    assert past
+    rim = stator.Rim(M, Y)
+    for rec in past:
+        s = 1.0 if rec["direction"] == "cw" else -1.0
+        with pytest.raises(ValueError, match="not in the lap after the last timestamp"):
+            rim.add_timing(rec["spin_id"], rec["clicks_s"], rec["truth"]["theta_f"], s)
 
 
 # ----------------------------------------------------------------------------
