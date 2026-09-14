@@ -16,14 +16,14 @@ struct BallTiming
     const std::string id;
     const std::vector<real> timestamps;
     const std::vector<real> tk;
-    const real theta;
+    const real theta;           // total travel from the first timestamp to departure, direction of travel
     const real s;               // +1 clockwise, -1 anticlockwise
 
     BallTiming(const std::string_view id, const std::vector<real>& ts, real theta, real s = 1.0)
         : id { id }
         , timestamps { ts }
         , tk { timestamps_to_tk(ts) }
-        , theta { theta + 2*pi*static_cast<real>(ts.size() - 1) }
+        , theta { theta }
         , s { s }
     {}
 

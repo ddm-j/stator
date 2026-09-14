@@ -148,14 +148,17 @@ public:
     real a_slope() const { return m_a_slope; }
 
     // Utility
+    // theta is total travel from timestamps[0] to departure, in the ball's direction of travel.
+    // Departure must be in the lap after the last timestamp.
     void add_timing(std::string_view id, std::vector<real>& timestamps, real theta, real s = 1.0)
     {
         if ((s != 1.0) && (s != -1.0))
             throw InvalidArgument("Rim.add_timing(): timing ID {} direction s must be +1 or -1, got {}", id, s);
         if (timestamps.size() <= 2)
             throw InvalidArgument("Rim.add_timing(): timing ID {} must have more than two timestamps.", id);
-        if (theta > 2*pi)
-            throw InvalidArgument("Rim.add_timing(): timing ID {} departure angle theat exceeds 2pi", id, theta);
+        const real laps { static_cast<real>(timestamps.size() - 1) };
+        if ((theta < 2*pi*laps) || (theta >= 2*pi*(laps + 1.0)))
+            throw InvalidArgument("Rim.add_timing(): timing ID {} departure travel {} is not in the lap after the last timestamp", id, theta);
         for (idx j {1}; j < timestamps.size(); j++)
             if (timestamps[j] <= timestamps[j-1])
                 throw InvalidArgument("Rim.add_timing(): timing ID {} has non-monotonic timestamps (t[{}] <= t[{}])", id, j, j-1);
