@@ -46,20 +46,33 @@ def spins():
     return out
 
 
-def rotor_crossings(v0, k, n_laps, t0=0.0):
-    """Times at which a decelerating rotor passes its reference, in radians."""
-    j = np.arange(n_laps + 1, dtype=float)
-    disc = v0 * v0 - 2.0 * k * TWO_PI * j
-    j = j[disc > 0]
+def rotor_passes(v0, k, angles, t0=0.0):
+    """Times at which a decelerating rotor reaches each angle, and those angles."""
+    angles = np.asarray(angles, dtype=float)
+    disc = v0 * v0 - 2.0 * k * angles
+    angles = angles[disc > 0]
     disc = disc[disc > 0]
-    return (t0 + (v0 - np.sqrt(disc)) / k).tolist()
+    return (t0 + (v0 - np.sqrt(disc)) / k).tolist(), angles.tolist()
+
+
+def rotor_crossings(v0, k, n_laps, t0=0.0):
+    """Full revolutions: one press per pass of the reference."""
+    return rotor_passes(v0, k, TWO_PI * np.arange(n_laps + 1), t0)
+
+
+def rotor_half_crossings(v0, k, n_laps, t0=0.0):
+    """Two half revolutions, then full ones: presses at 0, pi, 2pi, 4pi, ..."""
+    return rotor_passes(v0, k, [0.0, np.pi] + [TWO_PI * j for j in range(1, n_laps + 1)], t0)
+
+
+ROTORS = [(3.3, 0.055), (3.0, 0.050), (3.6, 0.060), (2.8, 0.048)]
 
 
 @pytest.fixture(scope="module")
 def wheel():
     w = stator.Wheel.European()
-    for i, (v0, k) in enumerate([(3.3, 0.055), (3.0, 0.050), (3.6, 0.060), (2.8, 0.048)]):
-        w.add_timing(f"W{i}", rotor_crossings(v0, k, 8, t0=100.0 * i))
+    for i, (v0, k) in enumerate(ROTORS):
+        w.add_timing(f"W{i}", *rotor_crossings(v0, k, 8, t0=100.0 * i))
     w.fit()
     assert w.decay_k > 0
     return w
@@ -71,6 +84,30 @@ def wheel():
 
 def test_wheel_is_stator_wheel():
     assert strike_fit.Wheel is stator.Wheel
+
+
+def test_rotor_fit_is_blind_to_the_timing_scheme():
+    """Rotors sharing one slow-down fit it exactly, timed in full or half-then-full revolutions."""
+    k = 0.05
+    full, half = stator.Wheel.European(), stator.Wheel.European()
+    for i, (v0, _) in enumerate(ROTORS):
+        full.add_timing(f"W{i}", *rotor_crossings(v0, k, 8, t0=100.0 * i))
+        half.add_timing(f"W{i}", *rotor_half_crossings(v0, k, 8, t0=100.0 * i))
+    full.fit()
+    half.fit()
+    assert full.decay_k == pytest.approx(k, rel=1e-9)
+    assert half.decay_k == pytest.approx(k, rel=1e-9)
+
+
+def test_rotor_timings_need_angles():
+    w = stator.Wheel.European()
+    ts, angles = rotor_crossings(3.0, 0.05, 4)
+    with pytest.raises(TypeError):
+        w.add_timing("W", ts)
+    with pytest.raises(ValueError):
+        w.add_timing("W", ts, angles[:-1])
+    with pytest.raises(ValueError):
+        w.add_timing("W", ts, [0.0, np.pi, np.pi, TWO_PI, 2 * TWO_PI])
 
 
 def test_pocket_table_is_the_european_ring(wheel):
@@ -177,11 +214,12 @@ def test_predictor_matches_stator_with_no_descent(spins, wheel, ball_sense, whee
     sib = Predictor(StrikeRim.from_params(A, B, DELTA, ETA, OMEGA_SQ, 0.0, 0.0, 0.0,
                                           lap_floor=0.0, a_slope=0.0, M=M, Y=Y), wheel)
     wheel_ts = [0.0, 2.05]
+    wheel_angles = [0.0, TWO_PI]
     compared = 0
     for sp in spins[:40]:
         ts = np.asarray(sp["ts"][: len(sp["ts"]) - M]) + 3.0     # off the rotor's zero
-        got_ref = ref.predict(ts.tolist(), wheel_ts, ball_sense, wheel_sense)
-        got_sib = sib.predict(ts.tolist(), wheel_ts, ball_sense, wheel_sense)
+        got_ref = ref.predict(ts.tolist(), wheel_ts, wheel_angles, ball_sense, wheel_sense)
+        got_sib = sib.predict(ts.tolist(), wheel_ts, wheel_angles, ball_sense, wheel_sense)
         if got_ref is None:
             assert got_sib is None
             continue
@@ -191,6 +229,30 @@ def test_predictor_matches_stator_with_no_descent(spins, wheel, ball_sense, whee
         assert got_sib.wheel_travel == pytest.approx(got_ref.wheel_travel, abs=1e-12)
         assert got_sib.wheel_angle == pytest.approx(got_ref.wheel_angle, abs=1e-12)
         assert got_sib.pocket == got_ref.pocket
+    assert compared > 20
+
+
+@pytest.mark.parametrize("model", ["stator", "strike_fit"])
+def test_rotor_interval_does_not_move_the_pocket(spins, wheel, model):
+    """0 -> pi, pi -> 2pi and 0 -> 2pi on one rotor all put the pocket in the same place."""
+    rim = (stator.Rim(A, B, DELTA, ETA, OMEGA_SQ) if model == "stator" else
+           StrikeRim.from_params(A, B, DELTA, ETA, OMEGA_SQ, 0.5, 0.5, 0.45,
+                                 lap_floor=0.0, a_slope=0.0, M=M, Y=Y))
+    pred = (stator.Predictor if model == "stator" else Predictor)(rim, wheel)
+    t, ang = rotor_passes(3.1, wheel.decay_k, [0.0, np.pi, TWO_PI])
+    intervals = [([t[0], t[1]], [ang[0], ang[1]]),
+                 ([t[1], t[2]], [ang[1], ang[2]]),
+                 ([t[0], t[2]], [ang[0], ang[2]])]
+    compared = 0
+    for sp in spins[:40]:
+        ts = (np.asarray(sp["ts"][: len(sp["ts"]) - M]) + 3.0).tolist()
+        got = [pred.predict(ts, wts, wang, 1.0, -1.0) for wts, wang in intervals]
+        if got[0] is None:
+            continue
+        compared += 1
+        for g in got[1:]:
+            assert g.wheel_travel == pytest.approx(got[0].wheel_travel, abs=1e-9)
+            assert g.pocket == got[0].pocket
     assert compared > 20
 
 
@@ -204,12 +266,13 @@ def test_descent_moves_the_pocket(spins, wheel):
     sib = Predictor(StrikeRim.from_params(A, B, DELTA, ETA, OMEGA_SQ, 0.5, 0.5, 0.45,
                                           lap_floor=0.0, a_slope=0.0, M=M, Y=Y), wheel)
     wheel_ts = [0.0, 2.05]
+    wheel_angles = [0.0, TWO_PI]
     moved = 0
     total = 0
     for sp in spins[:40]:
         ts = (np.asarray(sp["ts"][: len(sp["ts"]) - M]) + 3.0).tolist()
-        got_ref = ref.predict(ts, wheel_ts, 1.0, -1.0)
-        got_sib = sib.predict(ts, wheel_ts, 1.0, -1.0)
+        got_ref = ref.predict(ts, wheel_ts, wheel_angles, 1.0, -1.0)
+        got_sib = sib.predict(ts, wheel_ts, wheel_angles, 1.0, -1.0)
         if got_ref is None:
             continue
         total += 1

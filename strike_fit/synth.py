@@ -145,6 +145,7 @@ def generate(n: int = 1000, eta: float = 0.2, seed: int = 0, mode: str = "mechan
             "strike": strike,
             "legacy": legacy,
             "rotor_clicks_s": None,
+            "rotor_angles_rad": None,
             "flags": [],
             "truth": {
                 "omega0": float(omega0[i]),

@@ -9,7 +9,7 @@ from strike_fit import data
 def make_records():
     return [
         {"spin_id": "a", "direction": "cw", "clicks_s": [0.0, 1.1, 2.3], "strike": {"t_s": 5.0, "deflector": 3},
-         "legacy": {"angle_bin": 12}, "rotor_clicks_s": None, "flags": []},
+         "legacy": {"angle_bin": 12}, "rotor_clicks_s": None, "rotor_angles_rad": None, "flags": []},
         {"spin_id": "b", "direction": "ccw", "clicks_s": [0.0, 1.0, 2.1, 3.3], "strike": None},
     ]
 
@@ -43,12 +43,24 @@ def test_views_and_assertion(tmp_path):
     {"direction": "clockwise"},
     {"strike": {"t_s": 3.0, "deflector": 8}},
     {"strike": {"t_s": -1.0, "deflector": 1}},
+    {"rotor_clicks_s": [0.0, 1.0, 2.0]},                                        # no angles
+    {"rotor_angles_rad": [0.0, 3.1, 6.3]},                                       # no clicks
+    {"rotor_clicks_s": [0.0, 1.0, 2.0], "rotor_angles_rad": [0.0, 3.1]},        # length
+    {"rotor_clicks_s": [0.0, 1.0, 2.0], "rotor_angles_rad": [0.0, 3.1, 3.1]},   # not increasing
 ])
 def test_validation_rejects(bad):
     rec = dict(make_records()[0])
     rec.update(bad)
     with pytest.raises(ValueError):
         data.Dataset(data.Header(), [rec])
+
+
+def test_rotor_angles_load_with_clicks():
+    rec = dict(make_records()[0])
+    rec.update({"rotor_clicks_s": [0.0, 1.0, 2.1, 4.4], "rotor_angles_rad": [0.0, np.pi, 2 * np.pi, 4 * np.pi]})
+    spin = data.Dataset(data.Header(), [rec]).candidate_view()[0]
+    np.testing.assert_array_equal(spin.rotor_angles, [0.0, np.pi, 2 * np.pi, 4 * np.pi])
+    np.testing.assert_array_equal(spin.rotor_clicks, [0.0, 1.0, 2.1, 4.4])
 
 
 def test_header_validation():

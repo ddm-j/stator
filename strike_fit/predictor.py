@@ -57,12 +57,14 @@ class Predictor:
         self.rim = rim
         self.wheel = wheel
 
-    def predict(self, ball_ts, wheel_ts, ball_sense, wheel_sense):
+    def predict(self, ball_ts, wheel_ts, wheel_angles, ball_sense, wheel_sense):
         """Predict the pocket under the ball when it reaches the deflector.
 
-        ``ball_ts`` ends ``M`` laps before the strike, ``wheel_ts`` is the two
-        rotor crossings that time the rotor. Returns ``None`` when the ball
-        stage cannot produce an exit, as stator's does.
+        ``ball_ts`` ends ``M`` laps before the strike. ``wheel_ts`` is the two
+        rotor presses that time the rotor and ``wheel_angles`` the rotor angle
+        at each, radians from the pass's first press; any spacing is valid.
+        Returns ``None`` when the ball stage cannot produce an exit, as
+        stator's does.
         """
         ball_pred = self.rim.predict(ball_ts, ball_sense)
         if ball_pred is None:
@@ -71,7 +73,7 @@ class Predictor:
         ball_travel = ball_pred.theta
         t_drop = ball_pred.t_f + float(ball_ts[-1])
 
-        wheel_travel = float(self.wheel.predict(list(wheel_ts), t_drop))
+        wheel_travel = float(self.wheel.predict(list(wheel_ts), list(wheel_angles), t_drop))
 
         W = (math.copysign(ball_travel, ball_sense)
              - math.copysign(wheel_travel, wheel_sense)

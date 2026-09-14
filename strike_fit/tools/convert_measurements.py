@@ -151,6 +151,7 @@ def convert(timings_root, video, annotation_mode="reactive", fps=None, require_u
             "strike": strike,
             "legacy": legacy,
             "rotor_clicks_s": None,
+            "rotor_angles_rad": None,
             "flags": flags,
         })
     header = Header(n_deflectors=int(n_deflectors), annotation_mode=annotation_mode,

@@ -226,8 +226,11 @@ JSONL, one spin per line, plus a dataset header object:
  "strike": {"t_s": 8.412, "deflector": 5},
  "legacy": {"departure_bin": 17},
  "rotor_clicks_s": null,
+ "rotor_angles_rad": null,
  "flags": []}
 ```
+
+- `rotor_clicks_s` / `rotor_angles_rad`: rotor presses and the rotor angle at each, radians from the first press, both strictly increasing. Given together or not at all — no angle per press is ever assumed (half-revolution passes exist).
 
 - `clicks_s`: lap clicks, `t=0` at first click, strictly increasing.
 - `strike`: null for clean misses (spin then feeds Stage A only).

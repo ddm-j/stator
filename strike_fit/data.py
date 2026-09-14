@@ -74,6 +74,7 @@ class CandidateSpin:
     clicks: np.ndarray                  # lap clicks, clicks[0] == 0, strictly increasing
     strike: Optional[Strike]
     rotor_clicks: Optional[np.ndarray] = None
+    rotor_angles: Optional[np.ndarray] = None   # rotor angle at each rotor click, radians from the first
     flags: tuple = ()
 
     @property
@@ -107,17 +108,29 @@ def _validate_record(rec: dict, n_deflectors: int) -> None:
             raise ValueError(f"{rec.get('spin_id')}: deflector {d} outside 0..{n_deflectors - 1}")
         if float(st["t_s"]) <= 0.0:
             raise ValueError(f"{rec.get('spin_id')}: strike must come after the first click")
+    rc, ra = rec.get("rotor_clicks_s"), rec.get("rotor_angles_rad")
+    if (rc is None) != (ra is None):
+        # never guess a rotor angle per click: that is how full revolutions get assumed
+        raise ValueError(f"{rec.get('spin_id')}: rotor_clicks_s and rotor_angles_rad must be given together")
+    if rc is not None:
+        rc, ra = np.asarray(rc, dtype=float), np.asarray(ra, dtype=float)
+        if rc.ndim != 1 or rc.shape != ra.shape:
+            raise ValueError(f"{rec.get('spin_id')}: rotor_angles_rad must have one angle per rotor click")
+        if not (np.all(np.diff(rc) > 0) and np.all(np.diff(ra) > 0)):
+            raise ValueError(f"{rec.get('spin_id')}: rotor clicks and angles must be strictly increasing")
 
 
 def _spin_common(rec: dict) -> dict:
     st = rec.get("strike")
     rc = rec.get("rotor_clicks_s")
+    ra = rec.get("rotor_angles_rad")
     return dict(
         spin_id=str(rec["spin_id"]),
         direction=rec["direction"],
         clicks=np.asarray(rec["clicks_s"], dtype=float),
         strike=None if st is None else Strike(float(st["t_s"]), int(st["deflector"])),
         rotor_clicks=None if rc is None else np.asarray(rc, dtype=float),
+        rotor_angles=None if ra is None else np.asarray(ra, dtype=float),
         flags=tuple(rec.get("flags", ())),
     )
 

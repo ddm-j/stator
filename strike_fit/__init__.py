@@ -15,7 +15,7 @@ The interface mirrors stator's so an experiment can swap one for the other::
     rim = StrikeRim(M=4, Y=6)
     rim.add_timing(spin_id, crossings, t_strike, deflector, s)
     rim.fit()
-    pred = Predictor(rim, wheel).predict(ball_ts, wheel_ts, ball_sense, wheel_sense)
+    pred = Predictor(rim, wheel).predict(ball_ts, wheel_ts, wheel_angles, ball_sense, wheel_sense)
 """
 
 from stator import Wheel  # the rotor stage and pocket table, unchanged
