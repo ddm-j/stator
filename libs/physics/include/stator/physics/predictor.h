@@ -24,7 +24,7 @@ public:
         , m_wheel { std::move(wheel) }
     {}
 
-    std::optional<Prediction> predict(std::vector<real>& ball_ts, std::vector<real>& wheel_ts, const real ball_sense, const real wheel_sense) const
+    std::optional<Prediction> predict(std::vector<real>& ball_ts, std::vector<real>& wheel_ts, std::vector<real>& wheel_angles, const real ball_sense, const real wheel_sense) const
     {
         // Makes a roulette prediction based on ball timings and wheel timings
         // if (ball_ts.front() < wheel_ts.back())
@@ -38,7 +38,7 @@ public:
         const real t_drop { ball_pred.value().t_f + ball_ts.back() };
 
         // Predict Wheel Position
-        const real wheel_travel { m_wheel.predict(wheel_ts, t_drop) };
+        const real wheel_travel { m_wheel.predict(wheel_ts, wheel_angles, t_drop) };
 
         // Get Ball Position in Wheel Frame
         real W { std::copysign(ball_travel, ball_sense) - std::copysign(wheel_travel, wheel_sense) + m_wheel.get_pkt_ang()/2.0 };

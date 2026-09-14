@@ -159,22 +159,25 @@ PYBIND11_MODULE(_stator, m)
             .def_static("American", &Wheel::American)
             .def_static("European", &Wheel::European)
             .def("add_timing",
-                 [](Wheel& wheel, std::string_view id, std::vector<real> timestamps) {
-                     wheel.add_timing(id, timestamps);
+                 [](Wheel& wheel, std::string_view id, std::vector<real> timestamps,
+                    std::vector<real> angles) {
+                     wheel.add_timing(id, timestamps, angles);
                  },
-                 py::arg("id"), py::arg("timestamps"))
+                 py::arg("id"), py::arg("timestamps"), py::arg("angles"))
             .def("add_timing",
                  [](Wheel& wheel, std::vector<std::string> ids,
-                    std::vector<std::vector<real>> timestamps) {
-                     wheel.add_timing(ids, timestamps);
+                    std::vector<std::vector<real>> timestamps,
+                    std::vector<std::vector<real>> angles) {
+                     wheel.add_timing(ids, timestamps, angles);
                  },
-                 py::arg("ids"), py::arg("timestamps"))
+                 py::arg("ids"), py::arg("timestamps"), py::arg("angles"))
             .def("fit", &Wheel::fit)
             .def("predict",
-                 [](const Wheel& wheel, std::vector<real> timestamps, real t_drop) {
-                     return wheel.predict(timestamps, t_drop);
+                 [](const Wheel& wheel, std::vector<real> timestamps,
+                    std::vector<real> angles, real t_drop) {
+                     return wheel.predict(timestamps, angles, t_drop);
                  },
-                 py::arg("timestamps"), py::arg("t_drop"))
+                 py::arg("timestamps"), py::arg("angles"), py::arg("t_drop"))
             .def("get_pkt_index", &Wheel::get_pkt_index, py::arg("pocket"))
             .def("get_pkt_angle", &Wheel::get_pkt_angle, py::arg("pocket"))
             .def("get_pkt_from_angle", &Wheel::get_pkt_from_angle, py::arg("angle"))
@@ -194,10 +197,11 @@ PYBIND11_MODULE(_stator, m)
             .def(py::init<Rim, Wheel>(), py::arg("rim"), py::arg("wheel"))
             .def("predict",
                  [](const Predictor& pred, std::vector<real> ball_ts,
-                    std::vector<real> wheel_ts, real ball_sense, real wheel_sense) {
-                     return pred.predict(ball_ts, wheel_ts, ball_sense, wheel_sense);
+                    std::vector<real> wheel_ts, std::vector<real> wheel_angles,
+                    real ball_sense, real wheel_sense) {
+                     return pred.predict(ball_ts, wheel_ts, wheel_angles, ball_sense, wheel_sense);
                  },
-                 py::arg("ball_ts"), py::arg("wheel_ts"),
+                 py::arg("ball_ts"), py::arg("wheel_ts"), py::arg("wheel_angles"),
                  py::arg("ball_sense"), py::arg("wheel_sense"))
             .def("__repr__", [](const Predictor&) {
                 return std::string("Predictor()");
@@ -311,18 +315,26 @@ PYBIND11_MODULE(_stator, m)
         );
 
     // Rotor Decay Fitter
-    // Takes a list of per-spin timestamp lists. WheelTiming is an internal type,
-    // so the ids it carries are synthesised here rather than exposed; fit_rotor
-    // never reads them. Returns (k [rad/s^2], relative sigma of k).
+    // Takes per-spin timestamp lists and matching rotor angle lists. WheelTiming
+    // is an internal type, so the ids it carries are synthesised here rather than
+    // exposed; fit_rotor never reads them. Returns (k [rad/s^2], relative sigma of k).
     m.def("fit_rotor",
-            [](const std::vector<std::vector<real>>& timestamps) {
+            [](const std::vector<std::vector<real>>& timestamps,
+               const std::vector<std::vector<real>>& angles) {
+                if (angles.size() != timestamps.size())
+                    throw std::invalid_argument("fit_rotor(): timestamps and angles must be the same length");
                 std::vector<WheelTiming> timings;
                 timings.reserve(timestamps.size());
                 for (idx j {}; j < timestamps.size(); j++)
-                    timings.emplace_back(std::to_string(j), timestamps[j]);
+                {
+                    if (angles[j].size() != timestamps[j].size())
+                        throw std::invalid_argument("fit_rotor(): each timing needs one angle per timestamp");
+                    timings.emplace_back(std::to_string(j), timestamps[j], angles[j]);
+                }
                 return stator::physics::fit_rotor(timings);
             },
-            py::arg("timestamps")
+            py::arg("timestamps"),
+            py::arg("angles")
         );
 
     // // // Ball Timing Model

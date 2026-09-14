@@ -46,7 +46,7 @@ inline std::pair<real, real> fit_rotor(const std::vector<WheelTiming>& timings)
 
             A[row, spin] = t;
             A[row, k_col] = -t*t/2.0;
-            y[row, 0] = static_cast<real>(sample);
+            y[row, 0] = timings[spin].angles[sample] - timings[spin].angles[0];
             ++row;
         }
 
@@ -61,7 +61,7 @@ inline std::pair<real, real> fit_rotor(const std::vector<WheelTiming>& timings)
 
     real sigma_k { std::numeric_limits<real>::quiet_NaN() };
     if ((row - width) == 0)
-        return { 2*pi*k, sigma_k };
+        return { k, sigma_k };
 
     // Measure k uncertainty
     Matrix<real> r { y - A*p };
@@ -71,7 +71,7 @@ inline std::pair<real, real> fit_rotor(const std::vector<WheelTiming>& timings)
     Matrix<real> z { linalg::solvers::solve_cholesky(AtA, e_k) };
 
     sigma_k = sqrt(sig2 * z[k_col, 0]);
-    return {2*pi*k, sigma_k/k};
+    return {k, sigma_k/k};
 };
 
 class Wheel
@@ -91,48 +91,58 @@ public:
     }
 
     // Prediction
-    real predict(std::vector<real>& timestamps, const real t_drop) const
+    real predict(std::vector<real>& timestamps, std::vector<real>& angles, const real t_drop) const
     {
-        // Predicts total angular travel of the rotor from timestamps[0] to t_drop of the rotor
+        // Predicts the angle of the rotor at t_drop, in the same frame as angles
         if (m_decay_k == 0.0)
             throw InvalidArgument("Wheel.predict(): Wheel has not been fitted, decay constant == 0.");
         if (timestamps.size() != 2)
             throw InvalidArgument("Wheel.predict(): timestamps must be of size 2, representing the start and end of a rotor lap timing.");
+        if (angles.size() != 2)
+            throw InvalidArgument("Wheel.predict(): angles must be of size 2, matching timestamps.");
         if (timestamps[1] <= timestamps[0])
             throw InvalidArgument("Wheel.predict(): timestamps are non-monotonic. t[1] <= t[0]");
+        if (angles[1] <= angles[0])
+            throw InvalidArgument("Wheel.predict(): angles are non-monotonic. angle[1] <= angle[0]");
         if (t_drop <= timestamps[1])
             throw InvalidArgument("Wheel.predict(): t_drop must be a time after timestamps[1] in order to make a prediction");
 
         // Initial Angular Velocity
         const real T0 { timestamps[1] - timestamps[0] };
-        const real v0 { (2*pi + (m_decay_k / 2.0)*std::pow(T0, 2)) / T0};
+        const real v0 { (angles[1] - angles[0] + (m_decay_k / 2.0)*std::pow(T0, 2)) / T0};
 
         // Wheel Position Prediction
         const real t { t_drop - timestamps[0] };
         if (t > v0 / m_decay_k)
             throw NumericError("Wheel.predict(): prediction time horizon is beyond model capability. t_limit = {}s", v0/m_decay_k);
-        const real theta { v0*t - (m_decay_k / 2.0) * std::pow(t, 2) };
+        const real theta { angles[0] + v0*t - (m_decay_k / 2.0) * std::pow(t, 2) };
 
         return theta;
     }
 
     // Utility
-    void add_timing(std::string_view id, std::vector<real>& timestamps)
+    void add_timing(std::string_view id, std::vector<real>& timestamps, std::vector<real>& angles)
     {
         if (timestamps.size() <= 2)
             throw InvalidArgument("Wheel.add_timing(): timing ID {} must have more than two timestamps.", id);
+        if (angles.size() != timestamps.size())
+            throw InvalidArgument("Wheel.add_timing(): timing ID {} has {} timestamps but {} angles.", id, timestamps.size(), angles.size());
         for (idx j {1}; j < timestamps.size(); j++)
+        {
             if (timestamps[j] <= timestamps[j-1])
                 throw InvalidArgument("Wheel.add_timing(): timing ID {} has non-monotonic timestamps (t[{}] <= t[{}])", id, j, j-1);
-        m_wheel_timings.emplace_back(id, timestamps);
+            if (angles[j] <= angles[j-1])
+                throw InvalidArgument("Wheel.add_timing(): timing ID {} has non-monotonic angles (angle[{}] <= angle[{}])", id, j, j-1);
+        }
+        m_wheel_timings.emplace_back(id, timestamps, angles);
     }
 
-    void add_timing(std::vector<std::string>& ids, std::vector<std::vector<real>>& timestamps)
+    void add_timing(std::vector<std::string>& ids, std::vector<std::vector<real>>& timestamps, std::vector<std::vector<real>>& angles)
     {
-        if ((ids.size() != timestamps.size()))
-            throw InvalidArgument("Wheel.add_timing(): size of ids and timestamps vectors are not equal.");
+        if ((ids.size() != timestamps.size()) || (timestamps.size() != angles.size()))
+            throw InvalidArgument("Wheel.add_timing(): size of ids, timestamps, and angles vectors are not equal.");
         for (idx j {}; j < ids.size(); j++)
-            add_timing(ids[j], timestamps[j]);
+            add_timing(ids[j], timestamps[j], angles[j]);
     }
 
     // Accessors
